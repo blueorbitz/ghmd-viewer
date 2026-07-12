@@ -35,20 +35,20 @@ jobs:
 
           # Create .htaccess for SPA + API routing
           cat > deploy/public/.htaccess << 'EOF'
-          RewriteEngine On
-          RewriteBase /
+RewriteEngine On
+RewriteBase /
 
-          # If the request is for an existing file or directory, serve it directly
-          RewriteCond %{REQUEST_FILENAME} -f [OR]
-          RewriteCond %{REQUEST_FILENAME} -d
-          RewriteRule ^ - [L]
+# Route /api/* requests to index.php FIRST (before static file check)
+RewriteRule ^api/ index.php [L,QSA]
 
-          # Route /api/* requests to index.php
-          RewriteRule ^api/ index.php [L,QSA]
+# If the request is for an existing file or directory, serve it directly
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
 
-          # For everything else, serve the SPA
-          RewriteRule ^ client/index.html [L]
-          EOF
+# For everything else, serve the SPA
+RewriteRule ^ client/index.html [L]
+EOF
 
       - name: push-to-deploy-branch
         uses: s0/git-publish-subdir-action@develop

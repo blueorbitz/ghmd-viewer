@@ -101,12 +101,10 @@ setcookie('session_token', $sessionToken, [
     'samesite' => 'Strict',
 ]);
 
-// Redirect back to SPA with original hash state
+// Redirect back to SPA OAuth callback route so the frontend can verify and store auth state
 $frontendUrl = Env::get('FRONTEND_URL', 'http://localhost:5173');
-$redirectUrl = $frontendUrl;
-if (!empty($originalHash)) {
-    $redirectUrl .= '#' . $originalHash;
-}
+$callbackHash = '/oauth/callback?return_hash=' . urlencode($originalHash);
+$redirectUrl = $frontendUrl . '#' . $callbackHash;
 
 header("Location: {$redirectUrl}");
 exit;

@@ -242,7 +242,7 @@ export async function fetchPrivateContents(
   backendUrl?: string | null,
   fetchFn: typeof fetch = fetch,
 ): Promise<GitHubContentItem[]> {
-  const baseUrl = backendUrl ?? getAuthBackendUrl()
+  const baseUrl = backendUrl === undefined ? getAuthBackendUrl() : backendUrl
   if (!baseUrl) {
     throw new Error('Auth backend URL is not configured. Cannot access private repositories.')
   }
@@ -312,7 +312,7 @@ export async function fetchPrivateFileContent(
   backendUrl?: string | null,
   fetchFn: typeof fetch = fetch,
 ): Promise<string> {
-  const baseUrl = backendUrl ?? getAuthBackendUrl()
+  const baseUrl = backendUrl === undefined ? getAuthBackendUrl() : backendUrl
   if (!baseUrl) {
     throw new Error('Auth backend URL is not configured. Cannot access private repositories.')
   }

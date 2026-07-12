@@ -200,7 +200,6 @@ export function ReaderView({ state }: ReaderViewProps) {
               repo={repo}
               branch={branch}
               path={folderPath}
-              sessionToken=""
               onClose={() => setShowShareDialog(false)}
             />
           </div>

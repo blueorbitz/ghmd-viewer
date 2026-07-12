@@ -58,6 +58,14 @@ switch (true) {
         require __DIR__ . '/../src/routes/auth_logout.php';
         break;
 
+    case $method === 'POST' && $path === '/api/share/create':
+        require __DIR__ . '/../src/routes/share_create.php';
+        break;
+
+    case $method === 'POST' && $path === '/api/share/redeem':
+        require __DIR__ . '/../src/routes/share_redeem.php';
+        break;
+
     case $method === 'GET' && $path === '/api/auth/status':
         require __DIR__ . '/../src/routes/auth_status.php';
         break;

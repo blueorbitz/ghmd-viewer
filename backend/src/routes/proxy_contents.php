@@ -81,6 +81,14 @@ $owner = $parts[0];
 $repo = $parts[1];
 $path = $parts[2] ?? '';
 
+// --- Scope check: if session is scoped, verify the request is within allowed repo/path ---
+if (!$sessionManager->isWithinScope($session, $owner, $repo, $path)) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Access denied: this session is restricted to a specific repository path']);
+    exit;
+}
+
 // --- 5. Build GitHub API URL ---
 $githubApiUrl = "https://api.github.com/repos/{$owner}/{$repo}/contents/{$path}";
 

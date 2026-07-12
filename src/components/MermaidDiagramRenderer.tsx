@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTheme } from '@/components/ThemeProvider'
 
 interface MermaidDiagramRendererProps {
   code: string
@@ -21,11 +22,11 @@ function getUniqueDiagramId(): string {
 
 const RENDER_TIMEOUT_MS = 5000
 
-async function loadMermaid() {
+async function loadMermaid(theme: 'light' | 'dark') {
   const { default: mermaid } = await import('mermaid')
   mermaid.initialize({
     startOnLoad: false,
-    theme: 'default',
+    theme: theme === 'dark' ? 'dark' : 'default',
     securityLevel: 'strict',
   })
   return mermaid
@@ -35,6 +36,7 @@ export function MermaidDiagramRenderer({ code, enabled, renderTimeout = RENDER_T
   const [renderState, setRenderState] = useState<RenderState>({ status: 'idle' })
   const containerRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef(false)
+  const { effectiveTheme } = useTheme()
 
   useEffect(() => {
     if (!enabled) {
@@ -48,7 +50,7 @@ export function MermaidDiagramRenderer({ code, enabled, renderTimeout = RENDER_T
     const diagramId = getUniqueDiagramId()
 
     const renderPromise = (async () => {
-      const mermaid = await loadMermaid()
+      const mermaid = await loadMermaid(effectiveTheme)
       const { svg } = await mermaid.render(diagramId, code)
       return svg
     })()
@@ -73,7 +75,7 @@ export function MermaidDiagramRenderer({ code, enabled, renderTimeout = RENDER_T
     return () => {
       abortRef.current = true
     }
-  }, [code, enabled, renderTimeout])
+  }, [code, enabled, renderTimeout, effectiveTheme])
 
   // When disabled, show raw source code
   if (!enabled) {

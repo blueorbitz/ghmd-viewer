@@ -43,9 +43,16 @@ export function Header() {
 
   return (
     <header className="flex h-12 items-center justify-between border-b border-border bg-background px-4">
-      <h1 className="text-sm font-semibold text-foreground">
+      <a
+        href="#"
+        className="text-sm font-semibold text-foreground hover:text-foreground/80 transition-colors"
+        onClick={(e) => {
+          e.preventDefault()
+          window.location.hash = ''
+        }}
+      >
         GitHub Markdown Viewer
-      </h1>
+      </a>
 
       <div className="flex items-center gap-2">
         {/* Mermaid rendering toggle */}

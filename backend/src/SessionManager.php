@@ -113,6 +113,77 @@ class SessionManager
     }
 
     /**
+     * Create a scoped session that restricts access to a specific repo/path.
+     * Returns the scoped session token string.
+     *
+     * @param string $accessToken The GitHub access token
+     * @param array $scope Array with keys: owner, repo, branch, path
+     * @param int $expiresInHours Expiration time in hours
+     */
+    public function createScopedSession(string $accessToken, array $scope, int $expiresInHours): string
+    {
+        $sessionToken = $this->generateToken();
+        $now = time();
+
+        $sessionData = [
+            'installation_token' => $accessToken,
+            'created_at' => $now,
+            'expires_at' => $now + ($expiresInHours * 3600),
+            'scope' => [
+                'owner' => $scope['owner'],
+                'repo' => $scope['repo'],
+                'branch' => $scope['branch'],
+                'path' => $scope['path'],
+            ],
+        ];
+
+        file_put_contents(
+            $this->getSessionPath($sessionToken),
+            json_encode($sessionData, JSON_THROW_ON_ERROR),
+            LOCK_EX
+        );
+
+        return $sessionToken;
+    }
+
+    /**
+     * Check if a session is scoped and if the requested resource is within scope.
+     *
+     * @param array $session The session data
+     * @param string $owner Requested owner
+     * @param string $repo Requested repo
+     * @param string $path Requested path
+     * @return bool True if access is allowed, false if out of scope
+     */
+    public function isWithinScope(array $session, string $owner, string $repo, string $path): bool
+    {
+        // Unscoped sessions have full access
+        if (!isset($session['scope'])) {
+            return true;
+        }
+
+        $scope = $session['scope'];
+
+        // Owner and repo must match exactly
+        if ($scope['owner'] !== $owner || $scope['repo'] !== $repo) {
+            return false;
+        }
+
+        // Path must be within the scoped path (equal or a subpath)
+        $scopedPath = rtrim($scope['path'], '/');
+        $requestedPath = rtrim($path, '/');
+
+        if ($scopedPath === '') {
+            // Root scope — allow everything in this repo
+            return true;
+        }
+
+        // Exact match or subpath
+        return $requestedPath === $scopedPath
+            || str_starts_with($requestedPath, $scopedPath . '/');
+    }
+
+    /**
      * Retrieve a valid session by token.
      * Returns session data if valid, null if invalid or expired.
      */

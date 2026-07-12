@@ -7,6 +7,7 @@ import { isExternalLink, isRelativeMarkdownLink, resolveRelativePath } from '@/s
 import { useTheme } from '@/components/ThemeProvider'
 import { MermaidDiagramRenderer } from '@/components/MermaidDiagramRenderer'
 import { MarkdownImage } from '@/components/MarkdownImage'
+import { FrontmatterTable, parseFrontmatter } from '@/components/FrontmatterTable'
 
 import 'highlight.js/styles/github.css'
 import 'highlight.js/styles/github-dark.css'
@@ -155,18 +156,25 @@ export function MarkdownRenderer({
     [basePath, owner, repo, branch, isPrivate, mermaidEnabled, handleMdLinkClick],
   )
 
+  // Parse frontmatter from content
+  const { data: frontmatter, body: markdownBody } = useMemo(
+    () => parseFrontmatter(content),
+    [content],
+  )
+
   const containerClass = effectiveTheme === 'dark'
     ? 'markdown-body markdown-body--dark'
     : 'markdown-body'
 
   return (
     <div className={containerClass}>
+      {frontmatter && <FrontmatterTable data={frontmatter} />}
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
         components={components}
       >
-        {content}
+        {markdownBody}
       </ReactMarkdown>
     </div>
   )

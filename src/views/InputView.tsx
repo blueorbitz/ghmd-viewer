@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { parseGitHubUrl } from '@/services/github-url-parser'
-import { fetchPublicContents } from '@/services/github-service'
+import { fetchPublicContents, fetchPrivateContents } from '@/services/github-service'
 import { navigateToHash } from '@/services/url-state'
+import { createAuthService } from '@/services/auth-service'
 
 /**
  * InputView — The landing page where users paste a GitHub folder URL.
@@ -14,6 +15,9 @@ export function InputView() {
   const [url, setUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false)
+
+  const authService = useMemo(() => createAuthService(), [])
 
   const isSubmitDisabled = !url.trim() || isLoading
 
@@ -36,11 +40,16 @@ export function InputView() {
       }
 
       // Step 2: Try to fetch the folder contents directly.
-      // The GitHub Contents API (/repos/{owner}/{repo}/contents/{path}) supports CORS,
-      // unlike the /repos/{owner}/{repo} endpoint which may be blocked.
-      // If it succeeds, the repo is public and the path is a valid folder.
+      // If the user is authenticated, use private access (higher rate limits + private repos).
+      // Otherwise, try public access first.
+      const usePrivateAccess = authService.isPrivateAccessAvailable() && authService.isAuthenticated()
+
       try {
-        await fetchPublicContents(parsed.owner, parsed.repo, parsed.path, parsed.branch)
+        if (usePrivateAccess) {
+          await fetchPrivateContents(parsed.owner, parsed.repo, parsed.path, parsed.branch)
+        } else {
+          await fetchPublicContents(parsed.owner, parsed.repo, parsed.path, parsed.branch)
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
         if (message.includes('directory listing but received a file response')) {
@@ -50,11 +59,13 @@ export function InputView() {
         }
         if (message.includes('Folder not found')) {
           setError('Repository or folder not found. Check the URL, or it may be a private repository.')
+          setShowAuthPrompt(authService.isPrivateAccessAvailable() && !authService.isAuthenticated())
           setIsLoading(false)
           return
         }
         if (message.includes('rate limit')) {
           setError('GitHub API rate limit reached. Please try again later or authenticate for higher limits.')
+          setShowAuthPrompt(true)
           setIsLoading(false)
           return
         }
@@ -99,7 +110,10 @@ export function InputView() {
             value={url}
             onChange={(e) => {
               setUrl(e.target.value)
-              if (error) setError(null)
+              if (error) {
+                setError(null)
+                setShowAuthPrompt(false)
+              }
             }}
             onKeyDown={handleKeyDown}
             placeholder="https://github.com/owner/repo/tree/main/docs"
@@ -146,13 +160,31 @@ export function InputView() {
         </div>
 
         {error && (
-          <p
-            id="url-error"
-            role="alert"
-            className="text-sm text-destructive text-left"
-          >
-            {error}
-          </p>
+          <div className="text-left space-y-2">
+            <p
+              id="url-error"
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {error}
+            </p>
+            {showAuthPrompt && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (authService.isPrivateAccessAvailable()) {
+                    authService.initiateOAuth(window.location.hash || '/')
+                  } else {
+                    setError('Authentication backend is not configured. Set VITE_AUTH_BACKEND_URL to enable GitHub login.')
+                    setShowAuthPrompt(false)
+                  }
+                }}
+              >
+                Connect GitHub
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { createShareLink } from '@/services/share-service'
+import { createAuthService } from '@/services/auth-service'
 
 const EXPIRY_OPTIONS = [
   { label: '1 hour', value: 1 },
@@ -16,7 +17,6 @@ interface ShareCreateViewProps {
   repo: string
   branch: string
   path: string
-  sessionToken: string
   onClose: () => void
 }
 
@@ -32,7 +32,6 @@ export function ShareCreateView({
   repo,
   branch,
   path,
-  sessionToken,
   onClose,
 }: ShareCreateViewProps) {
   const [passphrase, setPassphrase] = useState('')
@@ -64,12 +63,40 @@ export function ShareCreateView({
     setIsGenerating(true)
 
     try {
+      // Step 1: Request a scoped session token from the backend
+      const authService = createAuthService()
+      const backendUrl = authService.getBackendUrl()
+      if (!backendUrl) {
+        throw new Error('Auth backend is not configured.')
+      }
+
+      const response = await fetch(`${backendUrl}/api/share/create`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          owner,
+          repo,
+          branch,
+          path,
+          expiresInHours,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || `Failed to create scoped session (${response.status})`)
+      }
+
+      const { scopedToken } = await response.json()
+
+      // Step 2: Encrypt the scoped token with the passphrase
       const link = await createShareLink({
         owner,
         repo,
         branch,
         path,
-        sessionToken,
+        sessionToken: scopedToken,
         passphrase,
         expiresInHours,
       })

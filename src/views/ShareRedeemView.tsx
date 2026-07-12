@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { parseShareLink, decryptPayload, isExpired } from '@/services/share-service'
 import { navigateToHash } from '@/services/url-state'
+import { createAuthService } from '@/services/auth-service'
 import type { ShareLinkPayload } from '@/types/share'
 
 const MAX_ATTEMPTS = 5
@@ -71,9 +72,34 @@ export function ShareRedeemView({ payload }: ShareRedeemViewProps) {
         const result = await decryptPayload(parsedPayload, passphrase)
 
         if (result.success) {
-          // Decryption succeeded — navigate to the reader view
-          // The session token from decryption can be used to set up the authenticated session
-          // For now, navigate to the reader view with the repo info
+          // Decryption succeeded — redeem the scoped token on the backend to set the session cookie
+          const authService = createAuthService()
+          const backendUrl = authService.getBackendUrl()
+
+          if (backendUrl) {
+            try {
+              const redeemResponse = await fetch(`${backendUrl}/api/share/redeem`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scopedToken: result.sessionToken }),
+              })
+
+              if (!redeemResponse.ok) {
+                const data = await redeemResponse.json().catch(() => ({}))
+                const newAttempts = attempts + 1
+                setAttempts(newAttempts)
+                setPassphrase('')
+                setError(data.error || 'Failed to redeem share token. It may have expired.')
+                return
+              }
+            } catch {
+              setError('Network error while redeeming share token.')
+              return
+            }
+          }
+
+          // Navigate to the reader view with the repo info
           navigateToHash({
             owner: parsedPayload.owner,
             repo: parsedPayload.repo,

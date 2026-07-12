@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MermaidDiagramRenderer } from '@/components/MermaidDiagramRenderer'
+import { ThemeProvider } from '@/components/ThemeProvider'
+import type { ReactNode } from 'react'
 
 const mockRender = vi.fn()
 const mockInitialize = vi.fn()
@@ -13,6 +15,10 @@ vi.mock('mermaid', () => ({
   },
 }))
 
+function Wrapper({ children }: { children: ReactNode }) {
+  return <ThemeProvider>{children}</ThemeProvider>
+}
+
 describe('MermaidDiagramRenderer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -21,7 +27,7 @@ describe('MermaidDiagramRenderer', () => {
   describe('when disabled', () => {
     it('should display raw source code in a code block', () => {
       const code = 'graph TD\n  A --> B'
-      render(<MermaidDiagramRenderer code={code} enabled={false} />)
+      render(<MermaidDiagramRenderer code={code} enabled={false} />, { wrapper: Wrapper })
 
       const preElement = document.querySelector('pre')
       expect(preElement).toBeInTheDocument()
@@ -32,7 +38,7 @@ describe('MermaidDiagramRenderer', () => {
 
     it('should not attempt to render mermaid diagrams', () => {
       const code = 'graph TD\n  A --> B'
-      render(<MermaidDiagramRenderer code={code} enabled={false} />)
+      render(<MermaidDiagramRenderer code={code} enabled={false} />, { wrapper: Wrapper })
 
       expect(mockRender).not.toHaveBeenCalled()
     })
@@ -42,7 +48,7 @@ describe('MermaidDiagramRenderer', () => {
     it('should show a loading state initially', () => {
       mockRender.mockImplementation(() => new Promise(() => {})) // never resolves
 
-      render(<MermaidDiagramRenderer code="graph TD\n  A --> B" enabled={true} />)
+      render(<MermaidDiagramRenderer code="graph TD\n  A --> B" enabled={true} />, { wrapper: Wrapper })
 
       expect(screen.getByText('Rendering diagram...')).toBeInTheDocument()
     })
@@ -51,7 +57,7 @@ describe('MermaidDiagramRenderer', () => {
       const mockSvg = '<svg><text>Rendered Diagram</text></svg>'
       mockRender.mockResolvedValue({ svg: mockSvg })
 
-      render(<MermaidDiagramRenderer code="graph TD\n  A --> B" enabled={true} />)
+      render(<MermaidDiagramRenderer code="graph TD\n  A --> B" enabled={true} />, { wrapper: Wrapper })
 
       await waitFor(() => {
         const container = document.querySelector('[class*="overflow-x-auto"]')
@@ -64,7 +70,7 @@ describe('MermaidDiagramRenderer', () => {
       mockRender.mockRejectedValue(new Error('Syntax error in graph'))
 
       const code = 'invalid mermaid syntax'
-      render(<MermaidDiagramRenderer code={code} enabled={true} />)
+      render(<MermaidDiagramRenderer code={code} enabled={true} />, { wrapper: Wrapper })
 
       await waitFor(() => {
         expect(screen.getByText(/Mermaid rendering error:/)).toBeInTheDocument()
@@ -84,7 +90,7 @@ describe('MermaidDiagramRenderer', () => {
 
       const code = 'graph TD\n  A --> B'
 
-      render(<MermaidDiagramRenderer code={code} enabled={true} renderTimeout={50} />)
+      render(<MermaidDiagramRenderer code={code} enabled={true} renderTimeout={50} />, { wrapper: Wrapper })
 
       await waitFor(() => {
         expect(screen.getByText(/Mermaid rendering error:/)).toBeInTheDocument()
@@ -102,7 +108,7 @@ describe('MermaidDiagramRenderer', () => {
       mockRender.mockResolvedValue({ svg: mockSvg })
 
       const code = 'graph TD\n  A --> B'
-      const { rerender } = render(<MermaidDiagramRenderer code={code} enabled={true} />)
+      const { rerender } = render(<MermaidDiagramRenderer code={code} enabled={true} />, { wrapper: Wrapper })
 
       await waitFor(() => {
         const container = document.querySelector('[class*="overflow-x-auto"]')
