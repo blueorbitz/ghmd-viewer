@@ -6,8 +6,8 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
 
 ## Tasks
 
-- [ ] 1. Set up project structure and core configuration
-  - [ ] 1.1 Initialize Vite + React + TypeScript project with shadcn/ui
+- [x] 1. Set up project structure and core configuration
+  - [x] 1.1 Initialize Vite + React + TypeScript project with shadcn/ui
     - Initialize a Vite project with `pnpm create vite` using the React + TypeScript template
     - Install dependencies with pnpm: `pnpm add react react-dom tailwindcss shadcn/ui lucide-react`
     - Configure Tailwind CSS with shadcn/ui theme support (dark mode via class strategy)
@@ -15,39 +15,46 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Create base directory structure: `src/components/`, `src/services/`, `src/views/`, `src/types/`, `src/lib/`
     - _Requirements: 12.1, 12.2, 11.6_
 
-  - [ ] 1.2 Define core TypeScript interfaces and types
+  - [x] 1.2 Define core TypeScript interfaces and types
     - Create `src/types/github.ts` with `ParsedGitHubUrl`, `GitHubContentItem`, `RepoAccessResult`, `GitHubContentsResponse`
     - Create `src/types/auth.ts` with `AuthResult`, `AuthService` interface
     - Create `src/types/share.ts` with `ShareLinkParams`, `ShareLinkPayload`, `DecryptResult`
     - Create `src/types/app.ts` with `AppError`, `FileTreeNode`, `ThemePreference`
     - _Requirements: 1.2, 6.3, 7.2, 11.1_
 
-  - [ ] 1.3 Set up hash-based routing and app shell
+  - [x] 1.3 Set up hash-based routing and app shell
     - Implement a lightweight hash router (no library needed) or use a hash-aware router
     - Create `App.tsx` with `ThemeProvider` wrapper and route handling for: InputView, ReaderView, OAuthCallbackView, SharePassphrasePrompt
     - Set up URL hash state encoding/decoding: `#/{owner}/{repo}/{branch}/{path}?file={filePath}`
     - _Requirements: 12.3, 13.1, 13.3, 13.4_
 
-  - [ ] 1.4 Set up Vitest and testing infrastructure
+  - [x] 1.4 Set up Vitest and testing infrastructure
     - Install testing dependencies with pnpm: `pnpm add -D vitest @testing-library/react @testing-library/jest-dom fast-check jsdom`
     - Configure vitest.config.ts with jsdom environment
     - Create `tests/` directory structure: `tests/unit/`, `tests/components/`, `tests/integration/`
     - _Requirements: (testing infrastructure)_
 
-- [ ] 2. Implement URL parsing and GitHub service
-  - [ ] 2.1 Implement GitHub URL parser
-    - Create `src/services/github-url-parser.ts`
-    - Parse URLs in format `https://github.com/{owner}/{repo}/tree/{branch}/{path}`
+- [-] 2. Implement URL parsing and GitHub service
+  - [ ] 2.1 Extend GitHub URL parser to accept multiple URL formats
+    - Update `src/services/github-url-parser.ts` to support three GitHub URL formats:
+      1. Full tree URL with path: `https://github.com/{owner}/{repo}/tree/{branch}/{path}` (existing)
+      2. Branch root URL: `https://github.com/{owner}/{repo}/tree/{branch}` (no subfolder — use empty string or root for path)
+      3. Repo root URL: `https://github.com/{owner}/{repo}` (no branch specified — resolve default branch via GitHub API)
+    - For format 3, add an async resolution step that calls `GET /repos/{owner}/{repo}` to read `default_branch` from the response
+    - Return `ParsedGitHubUrl | null` where `path` may be an empty string (representing the repo/branch root folder)
+    - Update `InputView` placeholder text to: `https://github.com/owner/repo/tree/main/docs` or `https://github.com/owner/repo`
+    - Update `InputView` error message to: `Invalid URL format. Accepted formats: https://github.com/{owner}/{repo}, https://github.com/{owner}/{repo}/tree/{branch}, or https://github.com/{owner}/{repo}/tree/{branch}/{path}`
     - Handle edge cases: branch names with slashes (use GitHub API to resolve ambiguity), missing segments, non-GitHub URLs
-    - Return `ParsedGitHubUrl | null`
+    - Ensure downstream consumers (GitHubService, url-state) handle empty `path` correctly (fetch root directory contents)
     - _Requirements: 1.2, 1.3, 1.4_
 
   - [ ]* 2.2 Write property tests for URL parser
-    - **Property 1: URL Parsing Round-Trip**
-    - **Property 2: Invalid URL Rejection**
+    - **Property 1: URL Parsing Round-Trip** — extended to cover all three URL formats
+    - **Property 2: Invalid URL Rejection** — ensure non-GitHub domains, malformed URLs, and invalid formats still return null
+    - Additional test cases: repo-root URLs produce a result with empty path, branch-root URLs produce a result with empty path and correct branch
     - **Validates: Requirements 1.2, 1.3, 1.4, 1.7**
 
-  - [ ] 2.3 Implement GitHubService for public repository access
+  - [x] 2.3 Implement GitHubService for public repository access
     - Create `src/services/github-service.ts`
     - Implement `fetchPublicContents()` — GET `/repos/{owner}/{repo}/contents/{path}?ref={branch}`
     - Implement `checkRepoAccess()` — determine public/private/not-found
@@ -60,7 +67,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 3: Case-Insensitive Markdown File Filtering**
     - **Validates: Requirements 2.2**
 
-  - [ ] 2.5 Implement recursive markdown file discovery
+  - [x] 2.5 Implement recursive markdown file discovery
     - Add `discoverMarkdownFiles()` to GitHubService
     - Recursively traverse directories up to 10 levels deep
     - Build `FileTreeNode[]` structure from discovered files
@@ -72,11 +79,11 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 12: File Tree Hierarchy Correctness**
     - **Validates: Requirements 2.5, 7.2**
 
-- [ ] 3. Checkpoint - Core services verified
+- [x] 3. Checkpoint - Core services verified
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Implement theme management and UI shell
-  - [ ] 4.1 Implement ThemeManager service
+- [x] 4. Implement theme management and UI shell
+  - [x] 4.1 Implement ThemeManager service
     - Create `src/services/theme-manager.ts`
     - Implement three-mode cycle: light → dark → system → light
     - Persist preference to localStorage key `ghmd-theme`
@@ -90,7 +97,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 17: Theme Persistence and Invalid Fallback**
     - **Validates: Requirements 11.1, 11.3, 11.5**
 
-  - [ ] 4.3 Implement Header component with theme and Mermaid toggles
+  - [x] 4.3 Implement Header component with theme and Mermaid toggles
     - Create `src/components/Header.tsx`
     - Add theme toggle button (cycles light/dark/system with icon changes)
     - Add Mermaid rendering toggle (on/off switch)
@@ -101,8 +108,8 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 15: Mermaid Toggle Persistence**
     - **Validates: Requirements 10.3**
 
-- [ ] 5. Implement InputView and URL state management
-  - [ ] 5.1 Implement InputView component
+- [x] 5. Implement InputView and URL state management
+  - [x] 5.1 Implement InputView component
     - Create `src/views/InputView.tsx`
     - Text input field for GitHub folder URL with submit button
     - Enter key submission support
@@ -112,7 +119,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Show loading state while checking repo access
     - _Requirements: 1.1, 1.3, 1.5, 1.6, 1.7_
 
-  - [ ] 5.2 Implement URL hash state management
+  - [x] 5.2 Implement URL hash state management
     - Create `src/services/url-state.ts`
     - Encode state: `#/{owner}/{repo}/{branch}/{folderPath}?file={relativeMdFilePath}`
     - Decode state from hash on app load
@@ -124,8 +131,8 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 18: URL Hash State Round-Trip**
     - **Validates: Requirements 13.1**
 
-- [ ] 6. Implement Sidebar and ReaderView layout
-  - [ ] 6.1 Implement Sidebar component
+- [x] 6. Implement Sidebar and ReaderView layout
+  - [x] 6.1 Implement Sidebar component
     - Create `src/components/Sidebar.tsx`
     - Display file tree structure with expandable/collapsible folders
     - Highlight currently active file
@@ -134,7 +141,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Loading state while files are being discovered
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
 
-  - [ ] 6.2 Implement ReaderView layout
+  - [x] 6.2 Implement ReaderView layout
     - Create `src/views/ReaderView.tsx`
     - Compose Sidebar + ContentArea + Header
     - Wire file selection from sidebar to content fetching
@@ -143,8 +150,8 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Display loading indicator while directory contents are being fetched
     - _Requirements: 7.3, 2.8, 13.1_
 
-- [ ] 7. Implement Markdown rendering
-  - [ ] 7.1 Implement MarkdownRenderer component
+- [x] 7. Implement Markdown rendering
+  - [x] 7.1 Implement MarkdownRenderer component
     - Create `src/components/MarkdownRenderer.tsx`
     - Use react-markdown with remark-gfm plugin for GFM support (tables, task lists, strikethrough, autolinks)
     - Install and configure rehype-highlight or shiki for syntax highlighting of fenced code blocks using `pnpm add rehype-highlight` (or `pnpm add shiki`)
@@ -152,7 +159,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Code blocks without language identifier render as plain monospace
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-  - [ ] 7.2 Implement link resolution in MarkdownRenderer
+  - [x] 7.2 Implement link resolution in MarkdownRenderer
     - Relative `.md` links → in-app navigation (call `onNavigate` prop)
     - External links (absolute URLs) → open in new tab with `target="_blank"` and `rel="noopener noreferrer"`
     - _Requirements: 8.6, 8.7_
@@ -161,7 +168,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 13: Link Classification and Resolution**
     - **Validates: Requirements 8.6, 8.7**
 
-  - [ ] 7.4 Implement ImageResolver for Markdown images
+  - [x] 7.4 Implement ImageResolver for Markdown images
     - Create `src/components/ImageResolver.tsx` or integrate into MarkdownRenderer custom image component
     - Resolve relative image paths to `https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{resolvedPath}` for public repos
     - Route through Auth_Backend proxy for private repos
@@ -175,7 +182,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 14: Image URL Resolution**
     - **Validates: Requirements 9.1, 9.2, 9.5**
 
-  - [ ] 7.6 Implement MermaidDiagramRenderer
+  - [x] 7.6 Implement MermaidDiagramRenderer
     - Create `src/components/MermaidDiagramRenderer.tsx`
     - Lazy-load mermaid.js library
     - Render mermaid code blocks as SVG when enabled
@@ -184,11 +191,11 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Implement 5-second rendering timeout (abort and show error + raw source)
     - _Requirements: 10.1, 10.4, 10.5, 10.6_
 
-- [ ] 8. Checkpoint - Frontend rendering verified
+- [x] 8. Checkpoint - Frontend rendering verified
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. Implement Auth service and OAuth flow
-  - [ ] 9.1 Implement AuthService (frontend)
+- [x] 9. Implement Auth service and OAuth flow
+  - [x] 9.1 Implement AuthService (frontend)
     - Create `src/services/auth-service.ts`
     - Implement `initiateOAuth()` — redirect to GitHub authorization page with client_id, redirect_uri, state (CSRF token)
     - Implement `handleOAuthCallback()` — process callback, validate state
@@ -198,7 +205,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Hide private-repo features when backend URL not configured
     - _Requirements: 3.2, 3.3, 3.7, 3.8, 3.9, 5.3, 12.4, 12.5_
 
-  - [ ] 9.2 Implement OAuthCallbackView
+  - [x] 9.2 Implement OAuthCallbackView
     - Create `src/views/OAuthCallbackView.tsx`
     - Handle the OAuth redirect callback from GitHub
     - Display loading state during token exchange
@@ -206,7 +213,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Redirect to original repo URL after successful auth
     - _Requirements: 3.4, 3.8, 3.9_
 
-  - [ ] 9.3 Implement private repo content fetching via proxy
+  - [x] 9.3 Implement private repo content fetching via proxy
     - Add `fetchPrivateContents()` to GitHubService
     - Route requests through `/api/proxy/contents/{owner}/{repo}/{path}?ref={branch}`
     - Route raw file fetches through `/api/proxy/raw/{owner}/{repo}/{path}?ref={branch}`
@@ -214,15 +221,15 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Handle installation access errors (show link to GitHub App settings)
     - _Requirements: 3.1, 3.5, 3.6, 3.7, 4.4_
 
-- [ ] 10. Implement PHP Auth Backend
-  - [ ] 10.1 Set up PHP backend project structure
+- [x] 10. Implement PHP Auth Backend
+  - [x] 10.1 Set up PHP backend project structure
     - Create `backend/` directory with: `public/index.php` (entry point/router), `src/` for classes, `.env.example`
     - Configure routing for API endpoints: `/api/auth/login`, `/api/auth/callback`, `/api/auth/logout`, `/api/auth/status`, `/api/proxy/contents/...`, `/api/proxy/raw/...`
     - Set up environment variable loading for GitHub App secrets (client_id, client_secret, private_key path, app_id)
     - Implement CORS headers for SPA cross-origin requests
     - _Requirements: 4.1, 4.2, 12.5_
 
-  - [ ] 10.2 Implement OAuth callback handler
+  - [x] 10.2 Implement OAuth callback handler
     - Create endpoint `GET /api/auth/callback`
     - Validate CSRF state parameter against stored state
     - Exchange authorization code for installation access token via GitHub API
@@ -237,7 +244,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 5: Session Token Expiry Constraint**
     - **Validates: Requirements 4.3**
 
-  - [ ] 10.4 Implement GitHub API proxy endpoint
+  - [x] 10.4 Implement GitHub API proxy endpoint
     - Create endpoint `GET /api/proxy/contents/{owner}/{repo}/{path}`
     - Validate Session_Token from cookie on every request
     - Return 401 if token is invalid or expired
@@ -246,14 +253,14 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Implement 30-second timeout for upstream requests
     - _Requirements: 4.4, 4.6, 4.7, 4.9, 5.5_
 
-  - [ ] 10.5 Implement login initiation and logout endpoints
+  - [x] 10.5 Implement login initiation and logout endpoints
     - Create `GET /api/auth/login` — generate CSRF state, store it, redirect to GitHub OAuth authorization URL
     - Create `POST /api/auth/logout` — validate Session_Token, invalidate session, clear cookie
     - Create `GET /api/auth/status` — return current auth status (authenticated/not)
     - _Requirements: 3.2, 5.3, 5.4_
 
-- [ ] 11. Implement Share service (client-side crypto)
-  - [ ] 11.1 Implement ShareService with Web Crypto API
+- [x] 11. Implement Share service (client-side crypto)
+  - [x] 11.1 Implement ShareService with Web Crypto API
     - Create `src/services/share-service.ts`
     - Implement `createShareLink()` — encrypt session info with AES-GCM using PBKDF2-derived key from passphrase
     - Implement `parseShareLink()` — extract encrypted payload from URL hash (`#/share/{base64url-payload}`)
@@ -272,18 +279,18 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - **Property 11: Expiration Timestamp Check**
     - **Validates: Requirements 6.2, 6.3, 6.4, 6.6, 6.7, 6.8, 6.9**
 
-  - [ ] 11.3 Implement SharePassphrasePrompt views
+  - [x] 11.3 Implement SharePassphrasePrompt views
     - Create `src/views/ShareCreateView.tsx` — prompt for passphrase (min 8 chars) + expiry selection, generate link
     - Create `src/views/ShareRedeemView.tsx` — prompt recipient for passphrase, decrypt, fetch content
     - Implement retry logic: max 5 attempts, 60-second lockout after exhaustion
     - Provide "Create Share Link" button in ReaderView when viewing private repos (only when backend is configured)
     - _Requirements: 6.1, 6.2, 6.5, 6.7, 6.8, 6.9, 12.4_
 
-- [ ] 12. Checkpoint - Full feature integration verified
+- [x] 12. Checkpoint - Full feature integration verified
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Error handling, edge cases, and final integration
-  - [ ] 13.1 Implement centralized error handling
+- [x] 13. Error handling, edge cases, and final integration
+  - [x] 13.1 Implement centralized error handling
     - Create `src/components/ErrorDisplay.tsx` — render errors with retry actions
     - Implement React Error Boundary around ContentArea
     - Map GitHub API status codes to AppError types
@@ -292,7 +299,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Clear private content display on session expiry (redirect to auth prompt)
     - _Requirements: 2.3, 2.4, 2.7, 3.7, 5.7, 13.5_
 
-  - [ ] 13.2 Wire all components together and verify end-to-end flows
+  - [x] 13.2 Wire all components together and verify end-to-end flows
     - Connect InputView → repo access check → route to ReaderView (public) or Auth prompt (private)
     - Connect ReaderView → Sidebar file selection → MarkdownRenderer
     - Connect OAuth flow → redirect → callback → session → private content access
@@ -301,7 +308,7 @@ Implement a React + TypeScript SPA (Vite) that fetches and renders Markdown file
     - Ensure build produces static files (HTML, CSS, JS) with no server-side runtime dependency
     - _Requirements: 1.5, 3.1, 12.1, 12.2, 12.3, 13.4_
 
-- [ ] 14. Final checkpoint - All features integrated and tested
+- [x] 14. Final checkpoint - All features integrated and tested
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

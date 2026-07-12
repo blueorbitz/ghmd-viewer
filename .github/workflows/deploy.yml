@@ -1,0 +1,60 @@
+name: Push release to deploy branch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build and Push
+
+    steps:
+      - name: git-checkout
+        uses: actions/checkout@v4
+
+      - name: setup-node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: install-frontend-dependencies
+        run: npm install -g pnpm && pnpm install
+
+      - name: build-frontend
+        run: pnpm build
+
+      - name: configure-deploy-directory
+        run: |
+          mkdir deploy
+
+          # Copy PHP backend as root
+          cp -r backend/* deploy/
+
+          # Move built frontend assets into public/client
+          mv dist deploy/public/client
+
+          # Create .htaccess for SPA + API routing
+          cat > deploy/public/.htaccess << 'EOF'
+          RewriteEngine On
+          RewriteBase /
+
+          # If the request is for an existing file or directory, serve it directly
+          RewriteCond %{REQUEST_FILENAME} -f [OR]
+          RewriteCond %{REQUEST_FILENAME} -d
+          RewriteRule ^ - [L]
+
+          # Route /api/* requests to index.php
+          RewriteRule ^api/ index.php [L,QSA]
+
+          # For everything else, serve the SPA
+          RewriteRule ^ client/index.html [L]
+          EOF
+
+      - name: push-to-deploy-branch
+        uses: s0/git-publish-subdir-action@develop
+        env:
+          REPO: self
+          BRANCH: deploy
+          FOLDER: deploy
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MESSAGE: "Build: ({sha}) {msg}"
