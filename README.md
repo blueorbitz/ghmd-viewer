@@ -109,29 +109,52 @@ Open `http://localhost:5173`. You should now see a login option that lets you au
 A GitHub Actions workflow is included at `.github/workflows/deploy.yml`. It:
 
 1. Builds the React frontend
-2. Merges it with the PHP backend into a single `deploy/` directory
+2. Merges it with the PHP backend into a flat directory structure
 3. Pushes the result to a `deploy` branch
 
-To use it:
+### GitHub Repository Variables
+
+Before running the workflow, set the following **repository variable** (not secret):
+
+**Settings → Secrets and variables → Actions → Variables tab → New repository variable**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VITE_AUTH_BACKEND_URL` | Yes | Your production backend URL (e.g., `https://api.example.com`). Baked into the frontend build. |
+
+### Running the Workflow
 
 1. Go to **Actions** tab in your GitHub repository
 2. Select **"Push release to deploy branch"**
 3. Click **"Run workflow"**
 
-The `deploy` branch will contain a directory structure ready to upload to any PHP-capable shared host (e.g., Hostinger):
+### Deploy Branch Structure
+
+The `deploy` branch will contain a flat directory structure where the root IS the document root:
 
 ```
-deploy/
-├── public/           ← Document root (point your web server here)
-│   ├── index.php     ← PHP entry point (routes /api/* requests)
-│   ├── client/       ← Built React SPA assets
-│   └── .htaccess     ← Apache rewrite rules
-├── src/              ← PHP backend source
-├── sessions/         ← Server-side session storage
-└── states/           ← CSRF state storage
+deploy/              ← Document root (point your web server here)
+├── .htaccess        ← Apache rewrite rules (blocks _app/, routes /api/*)
+├── index.php        ← PHP entry point
+├── client/          ← Built React SPA assets
+└── _app/            ← Protected backend internals (blocked by .htaccess)
+    └── src/         ← PHP backend source
 ```
 
-On your server, set the document root to the `public/` folder and ensure you have a `.env` file in the parent directory (one level above `public/`) with your production credentials.
+### Server Setup
+
+1. Point your subdomain's document root at the deployed directory (the root itself, not a subfolder).
+2. Create `_app/.env` on your server with production credentials:
+
+```env
+GITHUB_APP_ID=123456
+GITHUB_CLIENT_ID=Iv1.xxxxxxxxxx
+GITHUB_CLIENT_SECRET=your_client_secret_here
+FRONTEND_URL=https://your-frontend-url.example.com
+```
+
+3. Ensure `mod_rewrite` is enabled (Apache) and `.htaccess` overrides are allowed.
+4. The `sessions/` and `states/` directories inside `_app/` will be created automatically on first use. Ensure the web server user has write permission to `_app/`.
 
 ## Environment Variables Reference
 

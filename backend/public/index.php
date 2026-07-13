@@ -14,12 +14,21 @@ declare(strict_types=1);
  *   GET  /api/proxy/raw/…      - Proxy GitHub raw file content
  */
 
+// Resolve base path for backend internals.
+// In production (flat deploy), files are in _app/ alongside index.php.
+// In local dev (php -S from public/), files are one level up (../).
+if (is_dir(__DIR__ . '/_app/src')) {
+    define('APP_BASE', __DIR__ . '/_app');
+} else {
+    define('APP_BASE', dirname(__DIR__));
+}
+
 // Load environment variables
-require_once __DIR__ . '/../src/Env.php';
+require_once APP_BASE . '/src/Env.php';
 
 use GhmdViewer\Env;
 
-Env::load(__DIR__ . '/../.env');
+Env::load(APP_BASE . '/.env');
 
 // CORS handling
 $frontendUrl = Env::get('FRONTEND_URL', 'http://localhost:5173');
@@ -47,36 +56,36 @@ $method = $_SERVER['REQUEST_METHOD'];
 switch (true) {
     // Auth routes
     case $method === 'GET' && $path === '/api/auth/login':
-        require __DIR__ . '/../src/routes/auth_login.php';
+        require APP_BASE . '/src/routes/auth_login.php';
         break;
 
     case $method === 'GET' && $path === '/api/auth/callback':
-        require __DIR__ . '/../src/routes/auth_callback.php';
+        require APP_BASE . '/src/routes/auth_callback.php';
         break;
 
     case $method === 'POST' && $path === '/api/auth/logout':
-        require __DIR__ . '/../src/routes/auth_logout.php';
+        require APP_BASE . '/src/routes/auth_logout.php';
         break;
 
     case $method === 'POST' && $path === '/api/share/create':
-        require __DIR__ . '/../src/routes/share_create.php';
+        require APP_BASE . '/src/routes/share_create.php';
         break;
 
     case $method === 'POST' && $path === '/api/share/redeem':
-        require __DIR__ . '/../src/routes/share_redeem.php';
+        require APP_BASE . '/src/routes/share_redeem.php';
         break;
 
     case $method === 'GET' && $path === '/api/auth/status':
-        require __DIR__ . '/../src/routes/auth_status.php';
+        require APP_BASE . '/src/routes/auth_status.php';
         break;
 
     // Proxy routes
     case $method === 'GET' && str_starts_with($path, '/api/proxy/contents/'):
-        require __DIR__ . '/../src/routes/proxy_contents.php';
+        require APP_BASE . '/src/routes/proxy_contents.php';
         break;
 
     case $method === 'GET' && str_starts_with($path, '/api/proxy/raw/'):
-        require __DIR__ . '/../src/routes/proxy_raw.php';
+        require APP_BASE . '/src/routes/proxy_raw.php';
         break;
 
     // Not found

@@ -7,6 +7,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Build and Push
+    permissions:
+      contents: write
 
     steps:
       - name: git-checkout
@@ -21,17 +23,28 @@ jobs:
         run: npm install -g pnpm && pnpm install
 
       - name: build-frontend
-        run: pnpm build
+        env:
+          VITE_AUTH_BACKEND_URL: ${{ vars.VITE_AUTH_BACKEND_URL }}
+        run: |
+          echo "VITE_AUTH_BACKEND_URL=$VITE_AUTH_BACKEND_URL"
+          pnpm build
 
       - name: configure-deploy-directory
         run: |
           mkdir deploy
 
-          # Copy PHP backend as root (including dotfiles like .htaccess)
-          cp -r backend/. deploy/
+          # Public-facing files go at root (this IS the document root)
+          cp -r backend/public/. deploy/
 
-          # Move built frontend assets into public/client
-          mv dist deploy/public/client
+          # Backend internals go into _app/ (not web-accessible via .htaccess)
+          mkdir -p deploy/_app
+          cp -r backend/src deploy/_app/src
+
+          # Ignore .env and runtime dirs so git pull doesn't conflict with server files
+          printf ".env\nsessions/\nstates/\n" > deploy/_app/.gitignore
+
+          # Move built frontend assets into client/
+          mv dist deploy/client
 
       - name: push-to-deploy-branch
         uses: peaceiris/actions-gh-pages@v4
@@ -39,5 +52,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./deploy
           publish_branch: deploy
-          force_orphan: true
           commit_message: "Build: ${{ github.sha }}"

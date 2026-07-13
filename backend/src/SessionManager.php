@@ -25,6 +25,43 @@ class SessionManager
         if (!is_dir($this->statesDir)) {
             mkdir($this->statesDir, 0700, true);
         }
+
+        // Probabilistic cleanup: ~5% chance per request
+        if (random_int(1, 20) === 1) {
+            $this->purgeExpired();
+        }
+    }
+
+    /**
+     * Remove expired session and state files from disk.
+     */
+    public function purgeExpired(): void
+    {
+        $now = time();
+
+        // Purge expired sessions
+        foreach (glob($this->sessionsDir . '/sess_*.json') as $file) {
+            $content = file_get_contents($file);
+            if ($content === false) {
+                continue;
+            }
+            $data = json_decode($content, true);
+            if (!is_array($data) || ($data['expires_at'] ?? 0) < $now) {
+                unlink($file);
+            }
+        }
+
+        // Purge expired states
+        foreach (glob($this->statesDir . '/state_*.json') as $file) {
+            $content = file_get_contents($file);
+            if ($content === false) {
+                continue;
+            }
+            $data = json_decode($content, true);
+            if (!is_array($data) || ($data['expires_at'] ?? 0) < $now) {
+                unlink($file);
+            }
+        }
     }
 
     /**
