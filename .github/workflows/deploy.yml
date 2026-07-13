@@ -27,34 +27,17 @@ jobs:
         run: |
           mkdir deploy
 
-          # Copy PHP backend as root
-          cp -r backend/* deploy/
+          # Copy PHP backend as root (including dotfiles like .htaccess)
+          cp -r backend/. deploy/
 
           # Move built frontend assets into public/client
           mv dist deploy/public/client
 
-          # Create .htaccess for SPA + API routing
-          cat > deploy/public/.htaccess << 'EOF'
-RewriteEngine On
-RewriteBase /
-
-# Route /api/* requests to index.php FIRST (before static file check)
-RewriteRule ^api/ index.php [L,QSA]
-
-# If the request is for an existing file or directory, serve it directly
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-
-# For everything else, serve the SPA
-RewriteRule ^ client/index.html [L]
-EOF
-
       - name: push-to-deploy-branch
-        uses: s0/git-publish-subdir-action@develop
-        env:
-          REPO: self
-          BRANCH: deploy
-          FOLDER: deploy
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MESSAGE: "Build: ({sha}) {msg}"
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy
+          publish_branch: deploy
+          force_orphan: true
+          commit_message: "Build: ${{ github.sha }}"
