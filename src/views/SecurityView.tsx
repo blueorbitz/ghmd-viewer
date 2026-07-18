@@ -11,7 +11,7 @@ export function SecurityView() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
 
   useEffect(() => {
-    fetch('/SECURITY.md')
+    fetch(`${import.meta.env.BASE_URL}SECURITY.md`)
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to load security documentation (${res.status})`)
         return res.text()
