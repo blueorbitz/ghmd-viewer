@@ -5,14 +5,16 @@ export interface SidebarProps {
   fileTree: FileTreeNode[]
   activeFilePath: string | null
   onFileSelect: (filePath: string) => void
+  onDirectoryExpand: (dirPath: string) => Promise<FileTreeNode[]>
   isLoading: boolean
 }
 
 /**
- * Sidebar — Displays a tree of markdown files for navigation.
+ * Sidebar — Displays a tree of files for navigation.
+ * Directories are lazy-loaded: children are fetched only when a folder is expanded.
  * Includes responsive behavior: visible on desktop (≥768px), hamburger toggle on mobile.
  */
-export function Sidebar({ fileTree, activeFilePath, onFileSelect, isLoading }: SidebarProps) {
+export function Sidebar({ fileTree, activeFilePath, onFileSelect, onDirectoryExpand, isLoading }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const handleFileSelect = (filePath: string) => {
@@ -25,6 +27,7 @@ export function Sidebar({ fileTree, activeFilePath, onFileSelect, isLoading }: S
       fileTree={fileTree}
       activeFilePath={activeFilePath}
       onFileSelect={handleFileSelect}
+      onDirectoryExpand={onDirectoryExpand}
       isLoading={isLoading}
     />
   )
@@ -90,10 +93,11 @@ interface SidebarContentProps {
   fileTree: FileTreeNode[]
   activeFilePath: string | null
   onFileSelect: (filePath: string) => void
+  onDirectoryExpand: (dirPath: string) => Promise<FileTreeNode[]>
   isLoading: boolean
 }
 
-function SidebarContent({ fileTree, activeFilePath, onFileSelect, isLoading }: SidebarContentProps) {
+function SidebarContent({ fileTree, activeFilePath, onFileSelect, onDirectoryExpand, isLoading }: SidebarContentProps) {
   if (isLoading) {
     return (
       <div className="p-4">
@@ -125,7 +129,13 @@ function SidebarContent({ fileTree, activeFilePath, onFileSelect, isLoading }: S
 
   return (
     <nav className="p-2">
-      <FileTreeList nodes={fileTree} activeFilePath={activeFilePath} onFileSelect={onFileSelect} depth={0} />
+      <FileTreeList
+        nodes={fileTree}
+        activeFilePath={activeFilePath}
+        onFileSelect={onFileSelect}
+        onDirectoryExpand={onDirectoryExpand}
+        depth={0}
+      />
     </nav>
   )
 }
@@ -134,10 +144,11 @@ interface FileTreeListProps {
   nodes: FileTreeNode[]
   activeFilePath: string | null
   onFileSelect: (filePath: string) => void
+  onDirectoryExpand: (dirPath: string) => Promise<FileTreeNode[]>
   depth: number
 }
 
-function FileTreeList({ nodes, activeFilePath, onFileSelect, depth }: FileTreeListProps) {
+function FileTreeList({ nodes, activeFilePath, onFileSelect, onDirectoryExpand, depth }: FileTreeListProps) {
   return (
     <ul className="space-y-0.5" role="tree">
       {nodes.map((node) => (
@@ -146,6 +157,7 @@ function FileTreeList({ nodes, activeFilePath, onFileSelect, depth }: FileTreeLi
           node={node}
           activeFilePath={activeFilePath}
           onFileSelect={onFileSelect}
+          onDirectoryExpand={onDirectoryExpand}
           depth={depth}
         />
       ))}
@@ -217,11 +229,16 @@ interface FileTreeItemProps {
   node: FileTreeNode
   activeFilePath: string | null
   onFileSelect: (filePath: string) => void
+  onDirectoryExpand: (dirPath: string) => Promise<FileTreeNode[]>
   depth: number
 }
 
-function FileTreeItem({ node, activeFilePath, onFileSelect, depth }: FileTreeItemProps) {
+function FileTreeItem({ node, activeFilePath, onFileSelect, onDirectoryExpand, depth }: FileTreeItemProps) {
   const [expanded, setExpanded] = useState(false)
+  const [children, setChildren] = useState<FileTreeNode[]>(node.children ?? [])
+  const [loaded, setLoaded] = useState(node.loaded ?? false)
+  const [isLoadingChildren, setIsLoadingChildren] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const paddingLeft = `${depth * 12 + 8}px`
   const isActive = node.path === activeFilePath
 
@@ -246,13 +263,39 @@ function FileTreeItem({ node, activeFilePath, onFileSelect, depth }: FileTreeIte
     )
   }
 
-  // Directory node — collapsible
+  // Directory node — collapsible with lazy loading
+  const handleToggle = async () => {
+    if (expanded) {
+      // Collapsing — just toggle UI
+      setExpanded(false)
+      return
+    }
+
+    // Expanding
+    setExpanded(true)
+
+    // If not yet loaded, fetch children
+    if (!loaded) {
+      setIsLoadingChildren(true)
+      setLoadError(false)
+      try {
+        const fetchedChildren = await onDirectoryExpand(node.path)
+        setChildren(fetchedChildren)
+        setLoaded(true)
+      } catch {
+        setLoadError(true)
+      } finally {
+        setIsLoadingChildren(false)
+      }
+    }
+  }
+
   return (
     <li role="treeitem" aria-expanded={expanded}>
       <button
         className="w-full text-left text-sm font-medium text-muted-foreground px-2 py-1 rounded hover:bg-muted transition-colors truncate flex items-center gap-1"
         style={{ paddingLeft }}
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggle}
         aria-label={expanded ? `Collapse folder ${node.name}` : `Expand folder ${node.name}`}
         title={node.name}
       >
@@ -270,13 +313,50 @@ function FileTreeItem({ node, activeFilePath, onFileSelect, depth }: FileTreeIte
         </svg>
         <span className="truncate">{node.name}</span>
       </button>
-      {expanded && node.children && node.children.length > 0 && (
-        <FileTreeList
-          nodes={node.children}
-          activeFilePath={activeFilePath}
-          onFileSelect={onFileSelect}
-          depth={depth + 1}
-        />
+      {expanded && (
+        <>
+          {isLoadingChildren && (
+            <div className="flex items-center gap-1.5 py-1" style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}>
+              <svg
+                className="h-3 w-3 animate-spin text-muted-foreground"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" strokeOpacity="0.75" strokeLinecap="round" />
+              </svg>
+              <span className="text-xs text-muted-foreground">Loading…</span>
+            </div>
+          )}
+          {loadError && (
+            <div className="py-1" style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}>
+              <span className="text-xs text-destructive">Failed to load</span>
+              <button
+                className="ml-2 text-xs text-primary hover:underline"
+                onClick={handleToggle}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+          {!isLoadingChildren && !loadError && children.length > 0 && (
+            <FileTreeList
+              nodes={children}
+              activeFilePath={activeFilePath}
+              onFileSelect={onFileSelect}
+              onDirectoryExpand={onDirectoryExpand}
+              depth={depth + 1}
+            />
+          )}
+          {!isLoadingChildren && !loadError && loaded && children.length === 0 && (
+            <div className="py-1" style={{ paddingLeft: `${(depth + 1) * 12 + 8}px` }}>
+              <span className="text-xs text-muted-foreground">Empty folder</span>
+            </div>
+          )}
+        </>
       )}
     </li>
   )

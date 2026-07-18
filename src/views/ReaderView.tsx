@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { HashState } from '@/services/url-state'
 import { navigateToHash } from '@/services/url-state'
-import { discoverSupportedFiles, fetchFileContent, fetchPublicContents, fetchPrivateContents, fetchPrivateFileContent, fetchPdfContent, fetchPrivatePdfContent } from '@/services/github-service'
+import { discoverSupportedFilesShallow, fetchDirectoryChildren, fetchFileContent, fetchPublicContents, fetchPrivateContents, fetchPrivateFileContent, fetchPdfContent, fetchPrivatePdfContent } from '@/services/github-service'
 import { getFileType } from '@/lib/file-type'
 import { Header } from '@/components/Header'
 import { Sidebar } from '@/components/Sidebar'
@@ -67,7 +67,7 @@ export function ReaderView({ state }: ReaderViewProps) {
   // Derive file type from selected file's extension
   const fileType = file ? getFileType(file) : null
 
-  // Discover markdown files on mount or when repo/folder changes
+  // Discover supported files on mount or when repo/folder changes (shallow — top-level only)
   useEffect(() => {
     let cancelled = false
 
@@ -82,9 +82,9 @@ export function ReaderView({ state }: ReaderViewProps) {
           ? (o: string, r: string, p: string, b: string) => fetchPrivateContents(o, r, p, b)
           : (o: string, r: string, p: string, b: string) => fetchPublicContents(o, r, p, b)
 
-        // Wrap in fetchWithRetry — retries transient network errors with exponential backoff (max 3 attempts)
+        // Shallow discovery — only fetches the immediate directory contents
         const tree = await fetchWithRetry(() =>
-          discoverSupportedFiles(owner, repo, folderPath, branch, fetchFn),
+          discoverSupportedFilesShallow(owner, repo, folderPath, branch, fetchFn),
         )
 
         if (!cancelled) {
@@ -226,6 +226,21 @@ export function ReaderView({ state }: ReaderViewProps) {
     [owner, repo, branch, folderPath],
   )
 
+  // Handle lazy-loading a directory's children when expanded in the sidebar
+  const handleDirectoryExpand = useCallback(
+    async (dirPath: string): Promise<FileTreeNode[]> => {
+      const fetchFn = usePrivateAccess
+        ? (o: string, r: string, p: string, b: string) => fetchPrivateContents(o, r, p, b)
+        : (o: string, r: string, p: string, b: string) => fetchPublicContents(o, r, p, b)
+
+      const children = await fetchWithRetry(() =>
+        fetchDirectoryChildren(owner, repo, dirPath, branch, fetchFn),
+      )
+      return children
+    },
+    [owner, repo, branch, usePrivateAccess],
+  )
+
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
@@ -253,6 +268,7 @@ export function ReaderView({ state }: ReaderViewProps) {
           fileTree={fileTree}
           activeFilePath={activeFilePath}
           onFileSelect={handleFileSelect}
+          onDirectoryExpand={handleDirectoryExpand}
           isLoading={isSidebarLoading}
         />
 

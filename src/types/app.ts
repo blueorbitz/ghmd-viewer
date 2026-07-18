@@ -6,6 +6,8 @@ export interface FileTreeNode {
   type: 'file' | 'directory'
   children?: FileTreeNode[]
   fileType?: 'markdown' | 'pdf'
+  /** Whether directory children have been fetched (for lazy loading) */
+  loaded?: boolean
 }
 
 export interface AppError {

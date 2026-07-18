@@ -650,3 +650,99 @@ async function discoverSupportedRecursive(
 
   return sortFileTree(nodes)
 }
+
+/**
+ * Shallow discovery: fetch only the immediate contents of a directory (no recursion).
+ * Directories are included with `loaded: false` so the sidebar can lazy-load them on expand.
+ *
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param path - Directory path within the repository
+ * @param branch - Branch name
+ * @param fetchContentsFn - Function to fetch directory contents
+ * @returns Flat tree of supported files and unloaded directory placeholders
+ */
+export async function discoverSupportedFilesShallow(
+  owner: string,
+  repo: string,
+  path: string,
+  branch: string,
+  fetchContentsFn: (owner: string, repo: string, path: string, branch: string) => Promise<GitHubContentItem[]>,
+): Promise<FileTreeNode[]> {
+  const items = await fetchContentsFn(owner, repo, path, branch)
+  const nodes: FileTreeNode[] = []
+
+  // Collect supported files
+  const supportedFiles = items.filter((item) => item.type === 'file' && isSupportedFile(item.name))
+  for (const file of supportedFiles) {
+    const fileType = getFileType(file.name)
+    nodes.push({
+      name: file.name,
+      path: file.path,
+      type: 'file',
+      fileType: fileType === 'unsupported' ? undefined : fileType,
+    })
+  }
+
+  // Include all directories as unloaded placeholders (children unknown until expanded)
+  const directories = items.filter((item) => item.type === 'dir')
+  for (const dir of directories) {
+    nodes.push({
+      name: dir.name,
+      path: dir.path,
+      type: 'directory',
+      children: [],
+      loaded: false,
+    })
+  }
+
+  return sortFileTree(nodes)
+}
+
+/**
+ * Fetch the immediate children of a single directory for lazy-loading.
+ * Returns supported files and unloaded sub-directory placeholders.
+ *
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param dirPath - The directory path to expand
+ * @param branch - Branch name
+ * @param fetchContentsFn - Function to fetch directory contents
+ * @returns Children nodes for the directory
+ */
+export async function fetchDirectoryChildren(
+  owner: string,
+  repo: string,
+  dirPath: string,
+  branch: string,
+  fetchContentsFn: (owner: string, repo: string, path: string, branch: string) => Promise<GitHubContentItem[]>,
+): Promise<FileTreeNode[]> {
+  const items = await fetchContentsFn(owner, repo, dirPath, branch)
+  const nodes: FileTreeNode[] = []
+
+  // Supported files
+  const supportedFiles = items.filter((item) => item.type === 'file' && isSupportedFile(item.name))
+  for (const file of supportedFiles) {
+    const fileType = getFileType(file.name)
+    nodes.push({
+      name: file.name,
+      path: file.path,
+      type: 'file',
+      fileType: fileType === 'unsupported' ? undefined : fileType,
+    })
+  }
+
+  // Sub-directories as unloaded placeholders
+  const directories = items.filter((item) => item.type === 'dir')
+  for (const dir of directories) {
+    nodes.push({
+      name: dir.name,
+      path: dir.path,
+      type: 'directory',
+      children: [],
+      loaded: false,
+    })
+  }
+
+  return sortFileTree(nodes)
+}

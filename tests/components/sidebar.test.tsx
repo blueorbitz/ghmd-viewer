@@ -3,12 +3,15 @@ import { describe, it, expect, vi } from 'vitest'
 import { Sidebar } from '@/components/Sidebar'
 import type { FileTreeNode } from '@/types/app'
 
+const mockDirectoryExpand = vi.fn().mockResolvedValue([])
+
 const mockTree: FileTreeNode[] = [
   { name: 'README.md', path: 'README.md', type: 'file' },
   {
     name: 'docs',
     path: 'docs',
     type: 'directory',
+    loaded: true,
     children: [
       { name: 'guide.md', path: 'docs/guide.md', type: 'file' },
       { name: 'api.md', path: 'docs/api.md', type: 'file' },
@@ -24,6 +27,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath={null}
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -39,6 +43,7 @@ describe('Sidebar', () => {
         fileTree={[]}
         activeFilePath={null}
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={true}
       />,
     )
@@ -52,6 +57,7 @@ describe('Sidebar', () => {
         fileTree={[]}
         activeFilePath={null}
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -65,6 +71,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath={null}
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -95,6 +102,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath={null}
         onFileSelect={onFileSelect}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -111,6 +119,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath="README.md"
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -127,6 +136,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath={null}
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -141,6 +151,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath={null}
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -159,6 +170,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath={null}
         onFileSelect={() => {}}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
@@ -185,6 +197,7 @@ describe('Sidebar', () => {
         fileTree={mockTree}
         activeFilePath={null}
         onFileSelect={onFileSelect}
+        onDirectoryExpand={mockDirectoryExpand}
         isLoading={false}
       />,
     )
