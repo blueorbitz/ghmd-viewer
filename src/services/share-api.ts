@@ -17,12 +17,12 @@ export interface ShareEntry {
 }
 
 export class ShareApiError extends Error {
-  constructor(
-    public statusCode: number,
-    message: string,
-  ) {
+  statusCode: number;
+
+  constructor(statusCode: number, message: string) {
     super(message);
     this.name = 'ShareApiError';
+    this.statusCode = statusCode;
   }
 }
 
