@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { parseShareLink, decryptPayload, isExpired } from '@/services/share-service'
 import { navigateToHash } from '@/services/url-state'
-import { createAuthService, AUTH_STORAGE_KEY } from '@/services/auth-service'
+import { createAuthService, AUTH_STORAGE_KEY, AUTH_SCOPED_KEY } from '@/services/auth-service'
 import type { ShareLinkPayload } from '@/types/share'
 
 const MAX_ATTEMPTS = 5
@@ -101,6 +101,7 @@ export function ShareRedeemView({ payload }: ShareRedeemViewProps) {
 
           // Navigate to the reader view with the repo info
           localStorage.setItem(AUTH_STORAGE_KEY, 'true')
+          localStorage.setItem(AUTH_SCOPED_KEY, 'true')
           navigateToHash({
             owner: parsedPayload.owner,
             repo: parsedPayload.repo,

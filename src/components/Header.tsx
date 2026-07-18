@@ -67,17 +67,19 @@ export function Header() {
         {/* Shares link and Logout button (visible when authenticated) */}
         {authService.isAuthenticated() && (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="gap-1.5 text-xs"
-            >
-              <a href="#/shares" aria-label="Manage shared links">
-                <Link2 className="h-4 w-4" />
-                <span>Shares</span>
-              </a>
-            </Button>
+            {!authService.isScopedSession() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                asChild
+                className="gap-1.5 text-xs"
+              >
+                <a href="#/shares" aria-label="Manage shared links">
+                  <Link2 className="h-4 w-4" />
+                  <span>Shares</span>
+                </a>
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"

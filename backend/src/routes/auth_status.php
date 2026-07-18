@@ -50,5 +50,10 @@ if (!empty($appSlug)) {
     $response['app_install_url'] = "https://github.com/apps/{$appSlug}/installations/new";
 }
 
+// Indicate if this is a scoped (share link) session
+if (isset($session['scope'])) {
+    $response['scoped'] = true;
+}
+
 http_response_code(200);
 echo json_encode($response);

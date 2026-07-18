@@ -159,6 +159,10 @@ export function ShareCreateView({
         Create a passphrase-protected link to share this content with others.
       </p>
 
+      <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:border-yellow-700 dark:bg-yellow-950 px-3 py-2 text-xs text-yellow-800 dark:text-yellow-200">
+        <strong>Note:</strong> Logging out will expire all share links created from this session.
+      </div>
+
       {error && (
         <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
           {error}

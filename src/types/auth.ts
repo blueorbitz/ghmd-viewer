@@ -22,6 +22,7 @@ export interface PatLoginRequest {
 export interface AuthStatusResponse {
   authenticated: boolean;
   auth_method?: 'oauth' | 'pat';
+  scoped?: boolean;
 }
 
 /**
@@ -39,6 +40,9 @@ export interface AuthService {
 
   /** Check if user has an active session. */
   isAuthenticated(): boolean;
+
+  /** Check if the current session is a scoped (share link) session. */
+  isScopedSession(): boolean;
 
   /** Logout and clear session. */
   logout(): Promise<void>;

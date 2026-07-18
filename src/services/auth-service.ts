@@ -1,9 +1,13 @@
 import type { AuthResult, AuthService } from '@/types/auth';
 
 const STORAGE_KEY = 'ghmd-authenticated';
+const SCOPED_KEY = 'ghmd-scoped';
 
 /** The localStorage key used to track authentication state. */
 export const AUTH_STORAGE_KEY = STORAGE_KEY;
+
+/** The localStorage key used to track scoped (share link) session state. */
+export const AUTH_SCOPED_KEY = SCOPED_KEY;
 
 /**
  * Creates an AuthService instance that manages the GitHub App OAuth flow
@@ -79,6 +83,7 @@ export function createAuthService(): AuthService {
 
       if (data.authenticated) {
         localStorage.setItem(STORAGE_KEY, 'true');
+        localStorage.removeItem(SCOPED_KEY);
         return { success: true };
       }
 
@@ -108,12 +113,21 @@ export function createAuthService(): AuthService {
   }
 
   /**
+   * Check if the current session is a scoped (share link) session.
+   * Scoped sessions should not have access to share creation or management.
+   */
+  function isScopedSession(): boolean {
+    return localStorage.getItem(SCOPED_KEY) === 'true';
+  }
+
+  /**
    * Logout: POST to the backend to invalidate the session,
    * then clear the local storage flag.
    */
   async function logout(): Promise<void> {
-    // Clear local flag first
+    // Clear local flags first
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SCOPED_KEY);
 
     if (!backendUrl) {
       return;
@@ -191,6 +205,7 @@ export function createAuthService(): AuthService {
 
       if (data.authenticated) {
         localStorage.setItem(STORAGE_KEY, 'true');
+        localStorage.removeItem(SCOPED_KEY);
         return { success: true };
       }
 
@@ -224,6 +239,7 @@ export function createAuthService(): AuthService {
     handleOAuthCallback,
     loginWithPat,
     isAuthenticated,
+    isScopedSession,
     logout,
     getBackendUrl: () => backendUrl,
     isPrivateAccessAvailable,

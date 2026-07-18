@@ -55,8 +55,8 @@ export function ReaderView({ state }: ReaderViewProps) {
   // Auth service (memoized)
   const authService = useMemo(() => createAuthService(), [])
 
-  // Show "Create Share Link" button only when backend is configured and user is authenticated
-  const canShare = authService.isPrivateAccessAvailable() && authService.isAuthenticated()
+  // Show "Create Share Link" button only when backend is configured, user is authenticated, and not in a scoped session
+  const canShare = authService.isPrivateAccessAvailable() && authService.isAuthenticated() && !authService.isScopedSession()
 
   // Determine if we should use private access (backend configured + user authenticated)
   const usePrivateAccess = authService.isPrivateAccessAvailable() && authService.isAuthenticated()
