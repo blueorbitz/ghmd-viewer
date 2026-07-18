@@ -33,7 +33,7 @@ export function ReaderView({ state }: ReaderViewProps) {
   // Sidebar file tree state
   const [fileTree, setFileTree] = useState<FileTreeNode[]>([])
   const [isSidebarLoading, setIsSidebarLoading] = useState(true)
-  const [sidebarError, setSidebarError] = useState<string | null>(null)
+  const [sidebarError, setSidebarError] = useState<AppError | null>(null)
 
   // Content area state
   const [content, setContent] = useState<string | null>(null)
@@ -85,7 +85,7 @@ export function ReaderView({ state }: ReaderViewProps) {
         }
       } catch (err) {
         if (!cancelled) {
-          setSidebarError(err instanceof Error ? err.message : 'Failed to load directory contents.')
+          setSidebarError(mapErrorToAppError(err))
           setIsSidebarLoading(false)
         }
       }
@@ -244,11 +244,17 @@ export function ReaderView({ state }: ReaderViewProps) {
 
             {sidebarError && !file && (
               <ErrorDisplay
-                error={{
-                  type: 'network',
-                  message: sidebarError,
-                  retryable: true,
-                  action: 'retry',
+                error={sidebarError}
+                onRetry={() => {
+                  // Re-trigger sidebar discovery by clearing error
+                  setSidebarError(null)
+                  navigateToHash({ owner, repo, branch, folderPath, file: file ?? undefined })
+                }}
+                onAuthenticate={() => {
+                  authService.initiateOAuth(window.location.hash)
+                }}
+                onNewUrl={() => {
+                  window.location.hash = ''
                 }}
               />
             )}
