@@ -5,11 +5,14 @@ import {
   fetchPublicContents,
   checkRepoAccess,
   fetchFileContent,
+  fetchPdfContent,
   fetchPrivateContents,
   fetchPrivateFileContent,
+  fetchPrivatePdfContent,
   SessionExpiredError,
   InstallationAccessError,
   discoverMarkdownFiles,
+  discoverSupportedFiles,
 } from '@/services/github-service'
 import type { GitHubContentItem } from '@/types/github'
 
@@ -722,5 +725,365 @@ describe('fetchPrivateFileContent', () => {
 
     await expect(fetchPrivateFileContent('owner', 'repo', 'docs/file.md', 'main', backendUrl, mockFetch))
       .rejects.toThrow('Proxy API error: 502 Bad Gateway')
+  })
+})
+
+
+describe('fetchPdfContent', () => {
+  it('fetches raw binary content from raw.githubusercontent.com', async () => {
+    const mockArrayBuffer = new ArrayBuffer(8)
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(mockArrayBuffer),
+    })
+
+    const result = await fetchPdfContent('owner', 'repo', 'docs/file.pdf', 'main', mockFetch)
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://raw.githubusercontent.com/owner/repo/main/docs/file.pdf',
+    )
+    expect(result).toBe(mockArrayBuffer)
+  })
+
+  it('returns ArrayBuffer response type', async () => {
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46]).buffer
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(pdfBytes),
+    })
+
+    const result = await fetchPdfContent('owner', 'repo', 'file.pdf', 'main', mockFetch)
+
+    expect(result).toBeInstanceOf(ArrayBuffer)
+    expect(result.byteLength).toBe(4)
+  })
+
+  it('throws error on 404 response', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    })
+
+    await expect(fetchPdfContent('owner', 'repo', 'missing.pdf', 'main', mockFetch))
+      .rejects.toThrow('File not found')
+  })
+
+  it('throws error on network failure', async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new Error('Network timeout'))
+
+    await expect(fetchPdfContent('owner', 'repo', 'docs/file.pdf', 'main', mockFetch))
+      .rejects.toThrow('Network error while fetching PDF file')
+  })
+
+  it('throws descriptive error for other HTTP errors', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+    })
+
+    await expect(fetchPdfContent('owner', 'repo', 'docs/file.pdf', 'main', mockFetch))
+      .rejects.toThrow('Failed to fetch PDF content: 500 Internal Server Error')
+  })
+
+  it('encodes branch name in the URL', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    })
+
+    await fetchPdfContent('owner', 'repo', 'docs/file.pdf', 'feature/branch', mockFetch)
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://raw.githubusercontent.com/owner/repo/feature%2Fbranch/docs/file.pdf',
+    )
+  })
+})
+
+describe('fetchPrivatePdfContent', () => {
+  const backendUrl = 'https://auth.example.com'
+
+  it('fetches raw binary content from the proxy endpoint with credentials', async () => {
+    const mockArrayBuffer = new ArrayBuffer(16)
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(mockArrayBuffer),
+    })
+
+    const result = await fetchPrivatePdfContent('owner', 'repo', 'docs/secret.pdf', 'main', backendUrl, mockFetch)
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auth.example.com/api/proxy/raw/owner/repo/docs/secret.pdf?ref=main',
+      { credentials: 'include' },
+    )
+    expect(result).toBe(mockArrayBuffer)
+  })
+
+  it('returns ArrayBuffer response type', async () => {
+    const pdfBytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]).buffer
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(pdfBytes),
+    })
+
+    const result = await fetchPrivatePdfContent('owner', 'repo', 'file.pdf', 'main', backendUrl, mockFetch)
+
+    expect(result).toBeInstanceOf(ArrayBuffer)
+    expect(result.byteLength).toBe(5)
+  })
+
+  it('throws SessionExpiredError on 401 response', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+    })
+
+    await expect(fetchPrivatePdfContent('owner', 'repo', 'docs/file.pdf', 'main', backendUrl, mockFetch))
+      .rejects.toThrow(SessionExpiredError)
+  })
+
+  it('throws InstallationAccessError on 403 response', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+    })
+
+    await expect(fetchPrivatePdfContent('owner', 'repo', 'docs/file.pdf', 'main', backendUrl, mockFetch))
+      .rejects.toThrow(InstallationAccessError)
+  })
+
+  it('throws error on 404 response', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    })
+
+    await expect(fetchPrivatePdfContent('owner', 'repo', 'missing.pdf', 'main', backendUrl, mockFetch))
+      .rejects.toThrow('File not found')
+  })
+
+  it('throws error on network failure', async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new Error('Timeout'))
+
+    await expect(fetchPrivatePdfContent('owner', 'repo', 'docs/file.pdf', 'main', backendUrl, mockFetch))
+      .rejects.toThrow('Network error while fetching private PDF file')
+  })
+
+  it('throws error when backend URL is not configured', async () => {
+    const mockFetch = vi.fn()
+
+    await expect(fetchPrivatePdfContent('owner', 'repo', 'docs/file.pdf', 'main', null, mockFetch))
+      .rejects.toThrow('Auth backend URL is not configured')
+  })
+
+  it('encodes owner, repo, and branch in the URL', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    })
+
+    await fetchPrivatePdfContent('my-org', 'my-repo', 'docs/file.pdf', 'release/v2', backendUrl, mockFetch)
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auth.example.com/api/proxy/raw/my-org/my-repo/docs/file.pdf?ref=release%2Fv2',
+      expect.any(Object),
+    )
+  })
+
+  it('throws descriptive error for other HTTP errors', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+    })
+
+    await expect(fetchPrivatePdfContent('owner', 'repo', 'docs/file.pdf', 'main', backendUrl, mockFetch))
+      .rejects.toThrow('Proxy API error: 502 Bad Gateway')
+  })
+})
+
+describe('discoverSupportedFiles', () => {
+  it('discovers both markdown and PDF files in a flat directory', async () => {
+    const mockFetchContents = vi.fn().mockResolvedValue([
+      { name: 'README.md', path: 'docs/README.md', type: 'file', download_url: null },
+      { name: 'index.ts', path: 'docs/index.ts', type: 'file', download_url: null },
+      { name: 'report.pdf', path: 'docs/report.pdf', type: 'file', download_url: null },
+      { name: 'guide.MD', path: 'docs/guide.MD', type: 'file', download_url: null },
+    ])
+
+    const result = await discoverSupportedFiles('owner', 'repo', 'docs', 'main', mockFetchContents)
+
+    expect(result).toHaveLength(3)
+    // Sorted alphabetically: guide.MD, README.md, report.pdf
+    expect(result[0]).toEqual({ name: 'guide.MD', path: 'docs/guide.MD', type: 'file', fileType: 'markdown' })
+    expect(result[1]).toEqual({ name: 'README.md', path: 'docs/README.md', type: 'file', fileType: 'markdown' })
+    expect(result[2]).toEqual({ name: 'report.pdf', path: 'docs/report.pdf', type: 'file', fileType: 'pdf' })
+  })
+
+  it('includes directories that contain only PDF files', async () => {
+    const mockFetchContents = vi.fn()
+      .mockImplementation((_owner: string, _repo: string, path: string) => {
+        if (path === 'docs') {
+          return Promise.resolve([
+            { name: 'pdfs', path: 'docs/pdfs', type: 'dir' },
+          ])
+        }
+        if (path === 'docs/pdfs') {
+          return Promise.resolve([
+            { name: 'manual.pdf', path: 'docs/pdfs/manual.pdf', type: 'file', download_url: null },
+          ])
+        }
+        return Promise.resolve([])
+      })
+
+    const result = await discoverSupportedFiles('owner', 'repo', 'docs', 'main', mockFetchContents)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({
+      name: 'pdfs',
+      path: 'docs/pdfs',
+      type: 'directory',
+      children: [{ name: 'manual.pdf', path: 'docs/pdfs/manual.pdf', type: 'file', fileType: 'pdf' }],
+    })
+  })
+
+  it('sets fileType correctly based on extension', async () => {
+    const mockFetchContents = vi.fn().mockResolvedValue([
+      { name: 'notes.md', path: 'notes.md', type: 'file', download_url: null },
+      { name: 'REPORT.PDF', path: 'REPORT.PDF', type: 'file', download_url: null },
+      { name: 'slides.Pdf', path: 'slides.Pdf', type: 'file', download_url: null },
+    ])
+
+    const result = await discoverSupportedFiles('owner', 'repo', '', 'main', mockFetchContents)
+
+    expect(result).toHaveLength(3)
+    expect(result[0].fileType).toBe('markdown')
+    expect(result[1].fileType).toBe('pdf')
+    expect(result[2].fileType).toBe('pdf')
+  })
+
+  it('excludes unsupported file types', async () => {
+    const mockFetchContents = vi.fn().mockResolvedValue([
+      { name: 'image.png', path: 'image.png', type: 'file', download_url: null },
+      { name: 'script.js', path: 'script.js', type: 'file', download_url: null },
+      { name: 'data.json', path: 'data.json', type: 'file', download_url: null },
+    ])
+
+    const result = await discoverSupportedFiles('owner', 'repo', '', 'main', mockFetchContents)
+
+    expect(result).toEqual([])
+  })
+
+  it('respects max depth limit of 10 levels', async () => {
+    const mockFetchContents = vi.fn()
+      .mockImplementation((_owner: string, _repo: string, path: string) => {
+        return Promise.resolve([
+          { name: 'file.pdf', path: `${path}/file.pdf`, type: 'file', download_url: null },
+          { name: 'deeper', path: `${path}/deeper`, type: 'dir' },
+        ])
+      })
+
+    await discoverSupportedFiles('owner', 'repo', 'root', 'main', mockFetchContents)
+
+    // Default maxDepth is 10, so we should have 10 fetches (depths 0 through 9)
+    expect(mockFetchContents).toHaveBeenCalledTimes(10)
+  })
+
+  it('respects custom max depth limit', async () => {
+    const mockFetchContents = vi.fn()
+      .mockImplementation((_owner: string, _repo: string, path: string) => {
+        return Promise.resolve([
+          { name: 'doc.pdf', path: `${path}/doc.pdf`, type: 'file', download_url: null },
+          { name: 'sub', path: `${path}/sub`, type: 'dir' },
+        ])
+      })
+
+    await discoverSupportedFiles('owner', 'repo', 'root', 'main', mockFetchContents, 3)
+
+    expect(mockFetchContents).toHaveBeenCalledTimes(3)
+  })
+
+  it('sorts directories first, then files alphabetically', async () => {
+    const mockFetchContents = vi.fn()
+      .mockResolvedValueOnce([
+        { name: 'zebra.pdf', path: 'docs/zebra.pdf', type: 'file', download_url: null },
+        { name: 'beta', path: 'docs/beta', type: 'dir' },
+        { name: 'alpha.md', path: 'docs/alpha.md', type: 'file', download_url: null },
+        { name: 'alpha', path: 'docs/alpha', type: 'dir' },
+      ])
+      .mockResolvedValueOnce([
+        { name: 'note.pdf', path: 'docs/beta/note.pdf', type: 'file', download_url: null },
+      ])
+      .mockResolvedValueOnce([
+        { name: 'intro.md', path: 'docs/alpha/intro.md', type: 'file', download_url: null },
+      ])
+
+    const result = await discoverSupportedFiles('owner', 'repo', 'docs', 'main', mockFetchContents)
+
+    // Directories first (alphabetically), then files (alphabetically)
+    expect(result[0].name).toBe('alpha')
+    expect(result[0].type).toBe('directory')
+    expect(result[1].name).toBe('beta')
+    expect(result[1].type).toBe('directory')
+    expect(result[2].name).toBe('alpha.md')
+    expect(result[2].type).toBe('file')
+    expect(result[3].name).toBe('zebra.pdf')
+    expect(result[3].type).toBe('file')
+  })
+
+  it('excludes directories with no supported files', async () => {
+    const mockFetchContents = vi.fn()
+      .mockImplementation((_owner: string, _repo: string, path: string) => {
+        if (path === 'root') {
+          return Promise.resolve([
+            { name: 'readme.md', path: 'root/readme.md', type: 'file', download_url: null },
+            { name: 'images', path: 'root/images', type: 'dir' },
+          ])
+        }
+        if (path === 'root/images') {
+          return Promise.resolve([
+            { name: 'logo.png', path: 'root/images/logo.png', type: 'file', download_url: null },
+          ])
+        }
+        return Promise.resolve([])
+      })
+
+    const result = await discoverSupportedFiles('owner', 'repo', 'root', 'main', mockFetchContents)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({ name: 'readme.md', path: 'root/readme.md', type: 'file', fileType: 'markdown' })
+  })
+
+  it('handles fetch errors for subdirectories gracefully', async () => {
+    const mockFetchContents = vi.fn()
+      .mockImplementation((_owner: string, _repo: string, path: string) => {
+        if (path === 'docs') {
+          return Promise.resolve([
+            { name: 'report.pdf', path: 'docs/report.pdf', type: 'file', download_url: null },
+            { name: 'broken', path: 'docs/broken', type: 'dir' },
+          ])
+        }
+        if (path === 'docs/broken') {
+          return Promise.reject(new Error('Network error'))
+        }
+        return Promise.resolve([])
+      })
+
+    const result = await discoverSupportedFiles('owner', 'repo', 'docs', 'main', mockFetchContents)
+
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({ name: 'report.pdf', path: 'docs/report.pdf', type: 'file', fileType: 'pdf' })
+  })
+
+  it('handles empty directories gracefully', async () => {
+    const mockFetchContents = vi.fn().mockResolvedValue([])
+
+    const result = await discoverSupportedFiles('owner', 'repo', 'docs', 'main', mockFetchContents)
+
+    expect(result).toEqual([])
   })
 })

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { HashState } from '@/services/url-state'
 import { navigateToHash } from '@/services/url-state'
-import { discoverMarkdownFiles, fetchFileContent, fetchPublicContents, fetchPrivateContents, fetchPrivateFileContent } from '@/services/github-service'
+import { discoverSupportedFiles, fetchFileContent, fetchPublicContents, fetchPrivateContents, fetchPrivateFileContent, fetchPdfContent, fetchPrivatePdfContent } from '@/services/github-service'
+import { getFileType } from '@/lib/file-type'
 import { Header } from '@/components/Header'
 import { Sidebar } from '@/components/Sidebar'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
+import { PdfViewer } from '@/components/PdfViewer'
 import { useMermaid } from '@/components/MermaidProvider'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
@@ -37,8 +39,12 @@ export function ReaderView({ state }: ReaderViewProps) {
 
   // Content area state
   const [content, setContent] = useState<string | null>(null)
+  const [pdfData, setPdfData] = useState<Uint8Array | null>(null)
   const [isContentLoading, setIsContentLoading] = useState(false)
   const [contentError, setContentError] = useState<AppError | null>(null)
+
+  // Retry counter — incrementing this re-triggers the content fetch effect
+  const [fetchRetryCount, setFetchRetryCount] = useState(0)
 
   // Share link dialog state
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -58,6 +64,9 @@ export function ReaderView({ state }: ReaderViewProps) {
   // Active file path (relative to repo root)
   const activeFilePath = file ? `${folderPath}/${file}` : null
 
+  // Derive file type from selected file's extension
+  const fileType = file ? getFileType(file) : null
+
   // Discover markdown files on mount or when repo/folder changes
   useEffect(() => {
     let cancelled = false
@@ -75,7 +84,7 @@ export function ReaderView({ state }: ReaderViewProps) {
 
         // Wrap in fetchWithRetry — retries transient network errors with exponential backoff (max 3 attempts)
         const tree = await fetchWithRetry(() =>
-          discoverMarkdownFiles(owner, repo, folderPath, branch, fetchFn),
+          discoverSupportedFiles(owner, repo, folderPath, branch, fetchFn),
         )
 
         if (!cancelled) {
@@ -99,6 +108,7 @@ export function ReaderView({ state }: ReaderViewProps) {
   useEffect(() => {
     if (!file) {
       setContent(null)
+      setPdfData(null)
       setContentError(null)
       return
     }
@@ -106,24 +116,53 @@ export function ReaderView({ state }: ReaderViewProps) {
     let cancelled = false
 
     async function loadContent() {
+      // Clear previous content state when switching files
+      setContent(null)
+      setPdfData(null)
       setIsContentLoading(true)
       setContentError(null)
 
       try {
         const filePath = `${folderPath}/${file}`
+        const currentFileType = file ? getFileType(file) : null
 
-        // Wrap in fetchWithRetry — retries transient network errors with exponential backoff (max 3 attempts)
-        const text = await fetchWithRetry(() => {
-          if (usePrivateAccess) {
-            return fetchPrivateFileContent(owner, repo, filePath, branch)
-          } else {
-            return fetchFileContent(owner, repo, filePath, branch)
+        if (currentFileType === 'pdf') {
+          // Fetch PDF binary content
+          const arrayBuffer = await fetchWithRetry(() => {
+            if (usePrivateAccess) {
+              return fetchPrivatePdfContent(owner, repo, filePath, branch)
+            } else {
+              return fetchPdfContent(owner, repo, filePath, branch)
+            }
+          })
+
+          if (!cancelled) {
+            setPdfData(new Uint8Array(arrayBuffer))
+            setContent(null)
+            setIsContentLoading(false)
           }
-        })
+        } else if (currentFileType === 'markdown') {
+          // Fetch text content for markdown
+          const text = await fetchWithRetry(() => {
+            if (usePrivateAccess) {
+              return fetchPrivateFileContent(owner, repo, filePath, branch)
+            } else {
+              return fetchFileContent(owner, repo, filePath, branch)
+            }
+          })
 
-        if (!cancelled) {
-          setContent(text)
-          setIsContentLoading(false)
+          if (!cancelled) {
+            setContent(text)
+            setPdfData(null)
+            setIsContentLoading(false)
+          }
+        } else {
+          // Unsupported file type — don't fetch, clear both
+          if (!cancelled) {
+            setContent(null)
+            setPdfData(null)
+            setIsContentLoading(false)
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -132,6 +171,7 @@ export function ReaderView({ state }: ReaderViewProps) {
           // Clear private content on session expiry (auth_required) — Requirement 5.7
           if (appError.type === 'auth_required') {
             setContent(null)
+            setPdfData(null)
           }
 
           setContentError(appError)
@@ -142,7 +182,7 @@ export function ReaderView({ state }: ReaderViewProps) {
 
     loadContent()
     return () => { cancelled = true }
-  }, [owner, repo, branch, folderPath, file, usePrivateAccess])
+  }, [owner, repo, branch, folderPath, file, usePrivateAccess, fetchRetryCount])
 
   // Handle file selection from sidebar — update URL hash
   const handleFileSelect = useCallback(
@@ -265,13 +305,11 @@ export function ReaderView({ state }: ReaderViewProps) {
               <ErrorDisplay
                 error={contentError}
                 onRetry={() => {
-                  // Trigger a refetch by toggling state
+                  // Trigger a refetch by incrementing the retry counter
                   setContentError(null)
                   setContent(null)
-                  if (file) {
-                    // Re-trigger the file content fetch
-                    navigateToHash({ owner, repo, branch, folderPath, file })
-                  }
+                  setPdfData(null)
+                  setFetchRetryCount((c) => c + 1)
                 }}
                 onAuthenticate={() => {
                   authService.initiateOAuth(window.location.hash)
@@ -287,7 +325,19 @@ export function ReaderView({ state }: ReaderViewProps) {
               <EmptyState />
             )}
 
-            {!isContentLoading && !contentError && content !== null && (
+            {!isContentLoading && !contentError && fileType === 'pdf' && pdfData !== null && (
+              <PdfViewer
+                data={pdfData}
+                filename={file!}
+                downloadUrl={
+                  isPrivate
+                    ? `${authService.getBackendUrl()}/api/proxy/raw/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${activeFilePath}?ref=${encodeURIComponent(branch)}`
+                    : `https://raw.githubusercontent.com/${owner}/${repo}/${encodeURIComponent(branch)}/${activeFilePath}`
+                }
+              />
+            )}
+
+            {!isContentLoading && !contentError && fileType === 'markdown' && content !== null && (
               <MarkdownRenderer
                 content={content}
                 basePath={activeFilePath ? activeFilePath.split('/').slice(0, -1).join('/') : folderPath}
@@ -298,6 +348,10 @@ export function ReaderView({ state }: ReaderViewProps) {
                 mermaidEnabled={mermaidEnabled}
                 onNavigate={handleNavigate}
               />
+            )}
+
+            {!isContentLoading && !contentError && fileType === 'unsupported' && file && (
+              <UnsupportedFileMessage filename={file} />
             )}
           </main>
         </ErrorBoundary>
@@ -333,7 +387,21 @@ function EmptyState() {
       <div>
         <p className="text-lg font-medium text-foreground">Select a file</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose a Markdown file from the sidebar to view its content.
+          Choose a supported file from the sidebar to view its content.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/** Unsupported file type message */
+function UnsupportedFileMessage({ filename }: { filename: string }) {
+  return (
+    <div className="flex items-center justify-center py-12 text-center">
+      <div>
+        <p className="text-lg font-medium text-foreground">Unsupported file type</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The file &ldquo;{filename}&rdquo; has an unsupported format. Only Markdown (.md) and PDF (.pdf) files can be viewed.
         </p>
       </div>
     </div>

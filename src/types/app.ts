@@ -5,6 +5,7 @@ export interface FileTreeNode {
   path: string
   type: 'file' | 'directory'
   children?: FileTreeNode[]
+  fileType?: 'markdown' | 'pdf'
 }
 
 export interface AppError {

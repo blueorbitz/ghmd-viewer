@@ -1,5 +1,6 @@
 import type { GitHubContentItem, RepoAccessResult } from '@/types/github'
 import type { FileTreeNode } from '@/types/app'
+import { isSupportedFile, getFileType } from '@/lib/file-type'
 
 const GITHUB_API_BASE = 'https://api.github.com'
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com'
@@ -222,6 +223,98 @@ export async function fetchFileContent(
 
 
 /**
+ * Fetch the raw binary content of a PDF file from a public GitHub repository.
+ *
+ * Uses raw.githubusercontent.com for direct content access.
+ * Returns an ArrayBuffer to preserve binary integrity.
+ *
+ * Requirements: 2.1, 2.3
+ */
+export async function fetchPdfContent(
+  owner: string,
+  repo: string,
+  path: string,
+  branch: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ArrayBuffer> {
+  const url = `${GITHUB_RAW_BASE}/${owner}/${repo}/${encodeURIComponent(branch)}/${path}`
+
+  let response: Response
+  try {
+    response = await fetchFn(url)
+  } catch (error) {
+    throw new Error(
+      `Network error while fetching PDF file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    )
+  }
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('File not found.')
+    }
+    throw new Error(`Failed to fetch PDF content: ${response.status} ${response.statusText}`)
+  }
+
+  return response.arrayBuffer()
+}
+
+/**
+ * Fetch the raw binary content of a PDF file from a private GitHub repository
+ * via the auth backend proxy.
+ *
+ * Routes requests through: /api/proxy/raw/{owner}/{repo}/{path}?ref={branch}
+ * Includes session credentials (httpOnly cookie) for authentication.
+ * Returns an ArrayBuffer to preserve binary integrity.
+ *
+ * @throws {SessionExpiredError} when the backend returns 401 (session expired)
+ * @throws {InstallationAccessError} when the backend returns 403 (repo not in installation)
+ * @throws Error for network or other failures
+ *
+ * Requirements: 2.2, 2.3, 2.5, 2.6
+ */
+export async function fetchPrivatePdfContent(
+  owner: string,
+  repo: string,
+  path: string,
+  branch: string,
+  backendUrl?: string | null,
+  fetchFn: typeof fetch = fetch,
+): Promise<ArrayBuffer> {
+  const baseUrl = backendUrl === undefined ? getAuthBackendUrl() : backendUrl
+  if (!baseUrl) {
+    throw new Error('Auth backend URL is not configured. Cannot access private repositories.')
+  }
+
+  const url = `${baseUrl}/api/proxy/raw/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${path}?ref=${encodeURIComponent(branch)}`
+
+  let response: Response
+  try {
+    response = await fetchFn(url, {
+      credentials: 'include',
+    })
+  } catch (error) {
+    throw new Error(
+      `Network error while fetching private PDF file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    )
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new SessionExpiredError()
+    }
+    if (response.status === 403) {
+      throw new InstallationAccessError()
+    }
+    if (response.status === 404) {
+      throw new Error('File not found.')
+    }
+    throw new Error(`Proxy API error: ${response.status} ${response.statusText}`)
+  }
+
+  return response.arrayBuffer()
+}
+
+/**
  * Fetch the contents of a directory from a private GitHub repository
  * via the auth backend proxy.
  *
@@ -441,6 +534,109 @@ async function discoverRecursive(
   )
 
   // Only include directories that contain markdown files (directly or nested)
+  for (const { dir, children } of dirResults) {
+    if (children.length > 0) {
+      nodes.push({
+        name: dir.name,
+        path: dir.path,
+        type: 'directory',
+        children: sortFileTree(children),
+      })
+    }
+  }
+
+  return sortFileTree(nodes)
+}
+
+
+/**
+ * Recursively discover all supported files (Markdown + PDF) in a GitHub repository directory.
+ *
+ * Traverses directories up to `maxDepth` levels deep (default 10),
+ * building a hierarchical FileTreeNode[] structure containing supported
+ * files and the directories that contain them.
+ *
+ * Each file node includes a `fileType` field ('markdown' or 'pdf') based on extension.
+ *
+ * Supports both public (direct GitHub API) and private (proxy) modes
+ * via the `fetchContentsFn` parameter.
+ *
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param path - Directory path within the repository
+ * @param branch - Branch name
+ * @param fetchContentsFn - Function to fetch directory contents (enables public/private mode switching)
+ * @param maxDepth - Maximum recursion depth (default: 10)
+ * @returns Hierarchical tree of supported files and their parent directories
+ */
+export async function discoverSupportedFiles(
+  owner: string,
+  repo: string,
+  path: string,
+  branch: string,
+  fetchContentsFn: (owner: string, repo: string, path: string, branch: string) => Promise<GitHubContentItem[]>,
+  maxDepth: number = MAX_DISCOVERY_DEPTH,
+): Promise<FileTreeNode[]> {
+  return discoverSupportedRecursive(owner, repo, path, branch, fetchContentsFn, 0, maxDepth)
+}
+
+/**
+ * Internal recursive helper for discoverSupportedFiles.
+ * Returns supported files (MD + PDF) and directories that contain them.
+ */
+async function discoverSupportedRecursive(
+  owner: string,
+  repo: string,
+  path: string,
+  branch: string,
+  fetchContentsFn: (owner: string, repo: string, path: string, branch: string) => Promise<GitHubContentItem[]>,
+  currentDepth: number,
+  maxDepth: number,
+): Promise<FileTreeNode[]> {
+  if (currentDepth >= maxDepth) {
+    return []
+  }
+
+  let items: GitHubContentItem[]
+  try {
+    items = await fetchContentsFn(owner, repo, path, branch)
+  } catch {
+    // If fetching fails for a subdirectory, skip it gracefully
+    return []
+  }
+
+  const nodes: FileTreeNode[] = []
+
+  // Collect supported files (both .md and .pdf)
+  const supportedFiles = items.filter((item) => item.type === 'file' && isSupportedFile(item.name))
+  for (const file of supportedFiles) {
+    const fileType = getFileType(file.name)
+    nodes.push({
+      name: file.name,
+      path: file.path,
+      type: 'file',
+      fileType: fileType === 'unsupported' ? undefined : fileType,
+    })
+  }
+
+  // Recursively process directories
+  const directories = items.filter((item) => item.type === 'dir')
+  const dirResults = await Promise.all(
+    directories.map(async (dir) => {
+      const children = await discoverSupportedRecursive(
+        owner,
+        repo,
+        dir.path,
+        branch,
+        fetchContentsFn,
+        currentDepth + 1,
+        maxDepth,
+      )
+      return { dir, children }
+    }),
+  )
+
+  // Only include directories that contain supported files (directly or nested)
   for (const { dir, children } of dirResults) {
     if (children.length > 0) {
       nodes.push({

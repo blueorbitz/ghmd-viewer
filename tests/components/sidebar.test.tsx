@@ -56,7 +56,7 @@ describe('Sidebar', () => {
       />,
     )
 
-    expect(screen.getAllByText('No Markdown files found').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('No supported files found').length).toBeGreaterThan(0)
   })
 
   it('expands and collapses folders on click', () => {

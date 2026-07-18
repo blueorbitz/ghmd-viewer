@@ -6,14 +6,14 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
 
 ## Tasks
 
-- [ ] 1. Set up file type utilities and install dependencies
-  - [ ] 1.1 Install react-pdf dependency and configure PDF.js worker
+- [x] 1. Set up file type utilities and install dependencies
+  - [x] 1.1 Install react-pdf dependency and configure PDF.js worker
     - Run `pnpm add react-pdf` to add the runtime dependency
     - Create or update Vite config to handle the `pdfjs-dist` worker file
     - Set the `pdfjs-dist` worker source in a central config (e.g., `src/config/pdf-worker.ts`)
     - _Requirements: 3.1_
 
-  - [ ] 1.2 Create `src/lib/file-type.ts` with file type detection utilities
+  - [x] 1.2 Create `src/lib/file-type.ts` with file type detection utilities
     - Implement `getFileExtension(filename: string): string` — returns lowercase extension without dot
     - Implement `getFileType(filename: string): SupportedFileType` — returns `'pdf'`, `'markdown'`, or `'unsupported'`
     - Implement `isPdfFile(filename: string): boolean` and `isSupportedFile(filename: string): boolean`
@@ -26,8 +26,8 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - Use fast-check to generate random filenames with various extensions and casings
     - Verify `getFileType` returns `'pdf'` iff extension is `pdf` (case-insensitive), `'markdown'` iff `md`, and `'unsupported'` otherwise
 
-- [ ] 2. Extend service layer for PDF content fetching and file discovery
-  - [ ] 2.1 Add `fetchPdfContent` and `fetchPrivatePdfContent` to `src/services/github-service.ts`
+- [x] 2. Extend service layer for PDF content fetching and file discovery
+  - [x] 2.1 Add `fetchPdfContent` and `fetchPrivatePdfContent` to `src/services/github-service.ts`
     - Implement `fetchPdfContent(owner, repo, path, branch, fetchFn?)` that fetches from `raw.githubusercontent.com` with `ArrayBuffer` response type
     - Implement `fetchPrivatePdfContent(owner, repo, path, branch, backendUrl?, fetchFn?)` that fetches via `/api/proxy/raw/` with `credentials: 'include'` and `ArrayBuffer` response type
     - Handle 401 → `SessionExpiredError`, 403 → `InstallationAccessError`, network errors → propagate via `mapErrorToAppError`
@@ -39,7 +39,7 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - Use fast-check to generate random owner/repo/branch/path strings
     - Verify constructed URLs match the expected patterns
 
-  - [ ] 2.3 Extend file discovery to include PDF files
+  - [x] 2.3 Extend file discovery to include PDF files
     - Update or create `discoverSupportedFiles` function in `github-service.ts` that includes both `.md` and `.pdf` files
     - Ensure the same recursive depth limit (10 levels) applies
     - Add `fileType` field to `FileTreeNode` based on extension
@@ -56,11 +56,11 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - **Validates: Requirements 1.2**
     - Generate random `FileTreeNode[]` arrays and verify directories precede files and names are sorted with `localeCompare`
 
-- [ ] 3. Checkpoint - Ensure all tests pass
+- [x] 3. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 4. Implement PdfViewer component
-  - [ ] 4.1 Create `src/components/PdfViewer.tsx` with core rendering
+- [x] 4. Implement PdfViewer component
+  - [x] 4.1 Create `src/components/PdfViewer.tsx` with core rendering
     - Implement `PdfViewer` component with `PdfViewerProps` interface (data, filename, downloadUrl)
     - Use `react-pdf` `Document` and `Page` components to render all pages vertically with gaps
     - Manage internal state: `numPages`, `currentPage`, `zoomLevel`, `error`, `isLoaded`
@@ -71,7 +71,7 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - Set `role="document"` and `aria-label` containing the filename on the container
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 6.1, 6.5_
 
-  - [ ] 4.2 Create `src/components/PdfNavControls.tsx` with navigation and zoom
+  - [x] 4.2 Create `src/components/PdfNavControls.tsx` with navigation and zoom
     - Implement `PdfNavControls` component with `PdfNavControlsProps` interface
     - Display page indicator in format "current / total"
     - Implement next/previous page buttons that scroll to the target page
@@ -81,7 +81,7 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - Ensure all controls are keyboard accessible (Tab, Enter, Space)
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 6.2, 6.3, 6.6_
 
-  - [ ] 4.3 Implement scroll-based page tracking with IntersectionObserver
+  - [x] 4.3 Implement scroll-based page tracking with IntersectionObserver
     - Use IntersectionObserver to detect which page occupies the majority of the viewport
     - Update `currentPage` state as user scrolls
     - Update ARIA live region to announce page changes to screen readers
@@ -100,11 +100,11 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - **Validates: Requirements 4.1**
     - Generate random valid (currentPage, totalPages) pairs and verify output matches "{currentPage} / {totalPages}"
 
-- [ ] 5. Checkpoint - Ensure all tests pass
+- [x] 5. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Integrate PDF viewer into ReaderView and Sidebar
-  - [ ] 6.1 Update `ReaderView` to route between MarkdownRenderer and PdfViewer
+- [x] 6. Integrate PDF viewer into ReaderView and Sidebar
+  - [x] 6.1 Update `ReaderView` to route between MarkdownRenderer and PdfViewer
     - Import `getFileType` from `file-type.ts`
     - Add `pdfData: Uint8Array | null` state
     - Derive `fileType` from selected file's extension using `getFileType`
@@ -114,7 +114,7 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - Clear previous content state when switching files
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6_
 
-  - [ ] 6.2 Update `Sidebar` to use `discoverSupportedFiles` and show file type icons
+  - [x] 6.2 Update `Sidebar` to use `discoverSupportedFiles` and show file type icons
     - Replace `discoverMarkdownFiles` calls with `discoverSupportedFiles`
     - Display distinct icon for PDF files vs Markdown files in `FileTreeItem`
     - Update empty state message to "No supported files found"
@@ -132,8 +132,8 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - Test empty state message when no supported files exist
     - _Requirements: 1.4, 1.5_
 
-- [ ] 7. Error handling and edge cases
-  - [ ] 7.1 Integrate PDF error states with existing error display
+- [x] 7. Error handling and edge cases
+  - [x] 7.1 Integrate PDF error states with existing error display
     - Ensure network errors during PDF fetch show `ErrorDisplay` with retry button
     - Ensure 401 errors trigger re-authentication prompt
     - Ensure 403 errors trigger installation access prompt
@@ -151,7 +151,7 @@ This plan implements PDF viewing support in the ghmd-viewer application. The imp
     - Test retry button re-triggers fetch on network error
     - _Requirements: 3.4, 3.5, 6.5_
 
-- [ ] 8. Final checkpoint - Ensure all tests pass
+- [x] 8. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

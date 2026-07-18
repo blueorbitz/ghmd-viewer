@@ -118,7 +118,7 @@ function SidebarContent({ fileTree, activeFilePath, onFileSelect, isLoading }: S
   if (fileTree.length === 0) {
     return (
       <div className="p-4">
-        <p className="text-sm text-muted-foreground">No Markdown files found</p>
+        <p className="text-sm text-muted-foreground">No supported files found</p>
       </div>
     )
   }
@@ -153,6 +153,66 @@ function FileTreeList({ nodes, activeFilePath, onFileSelect, depth }: FileTreeLi
   )
 }
 
+/** Displays a small icon indicating the file type (PDF or Markdown). */
+function FileTypeIcon({ fileType }: { fileType?: 'markdown' | 'pdf' }) {
+  if (fileType === 'pdf') {
+    return (
+      <svg
+        className="h-4 w-4 shrink-0 text-red-500/70"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="2" y="1" width="12" height="14" rx="1" />
+        <text
+          x="8"
+          y="10.5"
+          textAnchor="middle"
+          fill="currentColor"
+          stroke="none"
+          fontSize="5"
+          fontWeight="bold"
+          fontFamily="system-ui, sans-serif"
+        >
+          PDF
+        </text>
+      </svg>
+    )
+  }
+
+  // Default: Markdown icon
+  return (
+    <svg
+      className="h-4 w-4 shrink-0 text-blue-500/70"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="2" y="1" width="12" height="14" rx="1" />
+      <text
+        x="8"
+        y="10.5"
+        textAnchor="middle"
+        fill="currentColor"
+        stroke="none"
+        fontSize="6"
+        fontWeight="bold"
+        fontFamily="system-ui, sans-serif"
+      >
+        M
+      </text>
+    </svg>
+  )
+}
+
 interface FileTreeItemProps {
   node: FileTreeNode
   activeFilePath: string | null
@@ -169,7 +229,7 @@ function FileTreeItem({ node, activeFilePath, onFileSelect, depth }: FileTreeIte
     return (
       <li role="treeitem">
         <button
-          className={`w-full text-left text-sm px-2 py-1 rounded transition-colors truncate ${
+          className={`w-full text-left text-sm px-2 py-1 rounded transition-colors truncate flex items-center gap-1.5 ${
             isActive
               ? 'bg-accent text-accent-foreground font-medium'
               : 'text-foreground hover:bg-muted'
@@ -179,7 +239,8 @@ function FileTreeItem({ node, activeFilePath, onFileSelect, depth }: FileTreeIte
           aria-current={isActive ? 'page' : undefined}
           title={node.name}
         >
-          {node.name}
+          <FileTypeIcon fileType={node.fileType} />
+          <span className="truncate">{node.name}</span>
         </button>
       </li>
     )
