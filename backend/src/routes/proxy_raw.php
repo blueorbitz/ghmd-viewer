@@ -154,7 +154,8 @@ if ($curlErrno !== 0) {
 
     http_response_code(502);
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'Failed to connect to GitHub', 'detail' => $curlError]);
+    error_log('proxy_raw: curl error ' . $curlErrno . ': ' . $curlError);
+    echo json_encode(['error' => 'Failed to connect to GitHub']);
     exit;
 }
 

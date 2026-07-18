@@ -19,9 +19,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../Env.php';
 require_once __DIR__ . '/../SessionManager.php';
+require_once __DIR__ . '/../RateLimiter.php';
 
 use GhmdViewer\Env;
 use GhmdViewer\SessionManager;
+use GhmdViewer\RateLimiter;
 
 header('Content-Type: application/json');
 
@@ -29,6 +31,18 @@ header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
+    exit;
+}
+
+// Rate limit: 5 attempts per minute per IP
+$rateLimiter = new RateLimiter(5, 60);
+$clientIp = RateLimiter::getClientIp();
+
+if (!$rateLimiter->attempt($clientIp, 'pat_login')) {
+    $retryAfter = $rateLimiter->retryAfter($clientIp, 'pat_login');
+    http_response_code(429);
+    header("Retry-After: {$retryAfter}");
+    echo json_encode(['error' => 'Too many login attempts. Please try again later.']);
     exit;
 }
 

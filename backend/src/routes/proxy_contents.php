@@ -100,12 +100,20 @@ if (!$sessionManager->isWithinScope($session, $owner, $repo, $path)) {
     exit;
 }
 
-// --- 6. Build GitHub API URL ---
+// --- 6. Build GitHub API URL (only forward whitelisted query parameters) ---
 $githubApiUrl = "https://api.github.com/repos/{$owner}/{$repo}/contents/{$path}";
 
 $queryString = parse_url($requestUri, PHP_URL_QUERY);
 if ($queryString !== null && $queryString !== '') {
-    $githubApiUrl .= '?' . $queryString;
+    parse_str($queryString, $queryParams);
+    $allowedParams = [];
+    // Only forward the 'ref' parameter to GitHub API
+    if (isset($queryParams['ref']) && is_string($queryParams['ref']) && $queryParams['ref'] !== '') {
+        $allowedParams['ref'] = $queryParams['ref'];
+    }
+    if (!empty($allowedParams)) {
+        $githubApiUrl .= '?' . http_build_query($allowedParams);
+    }
 }
 
 // --- 7. Forward request to GitHub API ---
@@ -143,7 +151,8 @@ if ($curlErrno !== 0) {
 
     http_response_code(502);
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'Failed to connect to GitHub API', 'detail' => $curlError]);
+    error_log('proxy_contents: curl error ' . $curlErrno . ': ' . $curlError);
+    echo json_encode(['error' => 'Failed to connect to GitHub API']);
     exit;
 }
 

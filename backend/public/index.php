@@ -38,7 +38,7 @@ if ($origin === $frontendUrl) {
     header("Access-Control-Allow-Origin: {$frontendUrl}");
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, Accept');
+    header('Access-Control-Allow-Headers: Content-Type, Accept, X-Requested-With');
 }
 
 // Handle CORS preflight
@@ -51,6 +51,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
 $path = parse_url($requestUri, PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
+
+// CSRF protection: POST requests to API must include X-Requested-With header.
+// This prevents cross-origin form submissions since custom headers trigger
+// a CORS preflight that will be blocked for unauthorized origins.
+if ($method === 'POST') {
+    $xRequestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+    if ($xRequestedWith !== 'XMLHttpRequest') {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Forbidden: missing CSRF header']);
+        exit;
+    }
+}
 
 // Route matching
 switch (true) {
@@ -81,10 +94,6 @@ switch (true) {
 
     case $method === 'GET' && $path === '/api/auth/status':
         require APP_BASE . '/src/routes/auth_status.php';
-        break;
-
-    case $method === 'POST' && $path === '/api/auth/pat-login':
-        require APP_BASE . '/src/routes/auth_pat_login.php';
         break;
 
     // Proxy routes

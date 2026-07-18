@@ -4,20 +4,28 @@ declare(strict_types=1);
 
 namespace GhmdViewer;
 
+require_once __DIR__ . '/Env.php';
+
 /**
  * File-based session manager for OAuth sessions.
- * Stores session data as JSON files in the sessions directory.
+ * Stores session data as encrypted JSON files in the sessions directory.
+ * Uses AES-256-GCM for at-rest encryption of sensitive session data.
  * No database required.
  */
 class SessionManager
 {
     private string $sessionsDir;
     private string $statesDir;
+    private ?string $encryptionKey;
 
     public function __construct(?string $sessionsDir = null, ?string $statesDir = null)
     {
         $this->sessionsDir = $sessionsDir ?? __DIR__ . '/../sessions';
         $this->statesDir = $statesDir ?? __DIR__ . '/../states';
+
+        // Load encryption key from environment (hex-encoded 32-byte key)
+        $keyHex = Env::get('SESSION_ENCRYPTION_KEY', '');
+        $this->encryptionKey = ($keyHex !== '') ? hex2bin($keyHex) : null;
 
         if (!is_dir($this->sessionsDir)) {
             mkdir($this->sessionsDir, 0700, true);
@@ -45,8 +53,8 @@ class SessionManager
             if ($content === false) {
                 continue;
             }
-            $data = json_decode($content, true);
-            if (!is_array($data) || ($data['expires_at'] ?? 0) < $now) {
+            $data = $this->decryptSessionData($content);
+            if ($data === null || ($data['expires_at'] ?? 0) < $now) {
                 unlink($file);
             }
         }
@@ -155,7 +163,7 @@ class SessionManager
 
         file_put_contents(
             $this->getSessionPath($sessionToken),
-            json_encode($sessionData, JSON_THROW_ON_ERROR),
+            $this->encryptSessionData($sessionData),
             LOCK_EX
         );
 
@@ -239,7 +247,7 @@ class SessionManager
         // Persist updated session
         file_put_contents(
             $this->getSessionPath($sessionToken),
-            json_encode($session, JSON_THROW_ON_ERROR),
+            $this->encryptSessionData($session),
             LOCK_EX
         );
 
@@ -279,7 +287,7 @@ class SessionManager
 
         file_put_contents(
             $this->getSessionPath($sessionToken),
-            json_encode($sessionData, JSON_THROW_ON_ERROR),
+            $this->encryptSessionData($sessionData),
             LOCK_EX
         );
 
@@ -313,7 +321,7 @@ class SessionManager
 
         file_put_contents(
             $this->getSessionPath($sessionToken),
-            json_encode($sessionData, JSON_THROW_ON_ERROR),
+            $this->encryptSessionData($sessionData),
             LOCK_EX
         );
 
@@ -379,8 +387,8 @@ class SessionManager
             return null;
         }
 
-        $session = json_decode($content, true);
-        if (!is_array($session)) {
+        $session = $this->decryptSessionData($content);
+        if ($session === null) {
             return null;
         }
 
@@ -420,5 +428,88 @@ class SessionManager
     private function getStatePath(string $state): string
     {
         return $this->statesDir . '/state_' . hash('sha256', $state) . '.json';
+    }
+
+    /**
+     * Encrypt session data for at-rest storage.
+     * If no encryption key is configured, returns plain JSON (backward compatible).
+     *
+     * @param array $data Session data to encrypt
+     * @return string Encrypted payload or plain JSON
+     */
+    private function encryptSessionData(array $data): string
+    {
+        $json = json_encode($data, JSON_THROW_ON_ERROR);
+
+        if ($this->encryptionKey === null) {
+            return $json;
+        }
+
+        $iv = random_bytes(12); // 96-bit IV for AES-GCM
+        $ciphertext = openssl_encrypt(
+            $json,
+            'aes-256-gcm',
+            $this->encryptionKey,
+            OPENSSL_RAW_DATA,
+            $iv,
+            $tag,
+            '',
+            16
+        );
+
+        if ($ciphertext === false) {
+            throw new \RuntimeException('Session encryption failed');
+        }
+
+        // Format: base64(iv + tag + ciphertext)
+        return 'ENC:' . base64_encode($iv . $tag . $ciphertext);
+    }
+
+    /**
+     * Decrypt session data from storage.
+     * Handles both encrypted and plain JSON formats (backward compatible).
+     *
+     * @param string $content Raw file content
+     * @return array|null Decrypted session data, or null on failure
+     */
+    private function decryptSessionData(string $content): ?array
+    {
+        // Check if content is encrypted
+        if (str_starts_with($content, 'ENC:')) {
+            if ($this->encryptionKey === null) {
+                // Encrypted data but no key configured
+                return null;
+            }
+
+            $payload = base64_decode(substr($content, 4), true);
+            if ($payload === false || strlen($payload) < 28) {
+                // 12 (IV) + 16 (tag) = 28 minimum
+                return null;
+            }
+
+            $iv = substr($payload, 0, 12);
+            $tag = substr($payload, 12, 16);
+            $ciphertext = substr($payload, 28);
+
+            $json = openssl_decrypt(
+                $ciphertext,
+                'aes-256-gcm',
+                $this->encryptionKey,
+                OPENSSL_RAW_DATA,
+                $iv,
+                $tag
+            );
+
+            if ($json === false) {
+                return null;
+            }
+
+            $data = json_decode($json, true);
+            return is_array($data) ? $data : null;
+        }
+
+        // Plain JSON (backward compatible with unencrypted sessions)
+        $data = json_decode($content, true);
+        return is_array($data) ? $data : null;
     }
 }

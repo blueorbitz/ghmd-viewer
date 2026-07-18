@@ -17,14 +17,29 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../SessionManager.php';
+require_once __DIR__ . '/../RateLimiter.php';
 
 use GhmdViewer\SessionManager;
+use GhmdViewer\RateLimiter;
 
 // Only accept POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Method not allowed']);
+    exit;
+}
+
+// Rate limit: 10 redemption attempts per minute per IP
+$rateLimiter = new RateLimiter(10, 60);
+$clientIp = RateLimiter::getClientIp();
+
+if (!$rateLimiter->attempt($clientIp, 'share_redeem')) {
+    $retryAfter = $rateLimiter->retryAfter($clientIp, 'share_redeem');
+    http_response_code(429);
+    header('Content-Type: application/json');
+    header("Retry-After: {$retryAfter}");
+    echo json_encode(['error' => 'Too many attempts. Please try again later.']);
     exit;
 }
 

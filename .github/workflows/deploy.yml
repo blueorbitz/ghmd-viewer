@@ -41,7 +41,7 @@ jobs:
           cp -r backend/src deploy/_app/src
 
           # Ignore .env and runtime dirs so git pull doesn't conflict with server files
-          printf ".env\nsessions/\nstates/\n" > deploy/_app/.gitignore
+          printf ".env\nsessions/\nstates/\nrate_limits/\n" > deploy/_app/.gitignore
 
           # Move built frontend assets into client/
           mv dist deploy/client

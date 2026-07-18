@@ -2,6 +2,9 @@ import type { AuthResult, AuthService } from '@/types/auth';
 
 const STORAGE_KEY = 'ghmd-authenticated';
 
+/** The localStorage key used to track authentication state. */
+export const AUTH_STORAGE_KEY = STORAGE_KEY;
+
 /**
  * Creates an AuthService instance that manages the GitHub App OAuth flow
  * and session state via the configured backend.
@@ -120,6 +123,9 @@ export function createAuthService(): AuthService {
       await fetch(`${backendUrl}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
       });
     } catch {
       // Logout request failed (network issue), but local state is cleared
@@ -159,6 +165,7 @@ export function createAuthService(): AuthService {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify(body),
       });

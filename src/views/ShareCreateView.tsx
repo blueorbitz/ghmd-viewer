@@ -73,7 +73,7 @@ export function ShareCreateView({
       const response = await fetch(`${backendUrl}/api/share/create`, {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({
           owner,
           repo,

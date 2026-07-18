@@ -15,9 +15,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../Env.php';
 require_once __DIR__ . '/../SessionManager.php';
+require_once __DIR__ . '/../RateLimiter.php';
 
 use GhmdViewer\Env;
 use GhmdViewer\SessionManager;
+use GhmdViewer\RateLimiter;
+
+// Rate limit: 10 login initiations per minute per IP
+$rateLimiter = new RateLimiter(10, 60);
+$clientIp = RateLimiter::getClientIp();
+
+if (!$rateLimiter->attempt($clientIp, 'oauth_login')) {
+    http_response_code(429);
+    header('Content-Type: application/json');
+    $retryAfter = $rateLimiter->retryAfter($clientIp, 'oauth_login');
+    header("Retry-After: {$retryAfter}");
+    echo json_encode(['error' => 'Too many requests. Please try again later.']);
+    exit;
+}
 
 $clientId = Env::get('GITHUB_CLIENT_ID');
 

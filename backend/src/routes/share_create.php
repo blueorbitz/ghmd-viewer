@@ -92,12 +92,20 @@ if ($accessToken === '') {
     exit;
 }
 
+// Cap scoped session expiry to never exceed the parent session's expiry.
+// This ensures that when the parent session expires (or is logged out and purged),
+// the scoped session cannot outlive the token's expected lifetime.
+$parentExpiresAt = $session['expires_at'] ?? (time() + 3600);
+$requestedExpiresAt = time() + ($expiresInHours * 3600);
+$cappedExpiresAt = min($requestedExpiresAt, $parentExpiresAt);
+$cappedExpiresInHours = max(1, (int) ceil(($cappedExpiresAt - time()) / 3600));
+
 $scopedToken = $sessionManager->createScopedSession($accessToken, [
     'owner' => $owner,
     'repo' => $repo,
     'branch' => $branch,
     'path' => $path,
-], $expiresInHours);
+], $cappedExpiresInHours);
 
 http_response_code(200);
 header('Content-Type: application/json');

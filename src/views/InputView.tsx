@@ -88,18 +88,24 @@ function Header({ authService }: { authService: AuthService }) {
 function AuthPromptButtons({
   authService,
   showPatForm,
+  pendingUrl,
   onShowPatForm,
   onError,
   onSubmit,
 }: {
   authService: AuthService
   showPatForm: boolean
+  pendingUrl: string
   onShowPatForm: (show: boolean) => void
   onError: (msg: string) => void
   onSubmit: () => void
 }) {
   function handleConnectGitHub() {
     try {
+      // Save the current URL input so it survives the OAuth redirect
+      if (pendingUrl.trim()) {
+        sessionStorage.setItem(PENDING_URL_KEY, pendingUrl)
+      }
       authService.initiateOAuth(window.location.hash || '/')
     } catch (err) {
       onError(err instanceof Error ? err.message : 'Failed to initiate OAuth')
@@ -132,6 +138,8 @@ function AuthPromptButtons({
   )
 }
 
+const PENDING_URL_KEY = 'ghmd-pending-url'
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 /**
@@ -141,7 +149,15 @@ function AuthPromptButtons({
  * to the reader view for public repos or prompts authentication for private repos.
  */
 export function InputView() {
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(() => {
+    // Restore the URL input from sessionStorage if it was saved before an OAuth redirect
+    const saved = sessionStorage.getItem(PENDING_URL_KEY)
+    if (saved) {
+      sessionStorage.removeItem(PENDING_URL_KEY)
+      return saved
+    }
+    return ''
+  })
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
@@ -280,6 +296,7 @@ export function InputView() {
                 <AuthPromptButtons
                   authService={authService}
                   showPatForm={showPatForm}
+                  pendingUrl={url}
                   onShowPatForm={setShowPatForm}
                   onError={(msg) => showError(msg, false)}
                   onSubmit={() => {

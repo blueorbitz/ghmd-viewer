@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { parseShareLink, decryptPayload, isExpired } from '@/services/share-service'
 import { navigateToHash } from '@/services/url-state'
-import { createAuthService } from '@/services/auth-service'
+import { createAuthService, AUTH_STORAGE_KEY } from '@/services/auth-service'
 import type { ShareLinkPayload } from '@/types/share'
 
 const MAX_ATTEMPTS = 5
@@ -81,7 +81,7 @@ export function ShareRedeemView({ payload }: ShareRedeemViewProps) {
               const redeemResponse = await fetch(`${backendUrl}/api/share/redeem`, {
                 method: 'POST',
                 credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 body: JSON.stringify({ scopedToken: result.sessionToken }),
               })
 
@@ -100,6 +100,7 @@ export function ShareRedeemView({ payload }: ShareRedeemViewProps) {
           }
 
           // Navigate to the reader view with the repo info
+          localStorage.setItem(AUTH_STORAGE_KEY, 'true')
           navigateToHash({
             owner: parsedPayload.owner,
             repo: parsedPayload.repo,

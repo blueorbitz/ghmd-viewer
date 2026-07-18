@@ -230,7 +230,7 @@ describe('AuthService', () => {
       expect(localStorage.getItem('ghmd-authenticated')).toBeNull()
       expect(fetchSpy).toHaveBeenCalledWith(
         'http://localhost:8080/api/auth/logout',
-        { method: 'POST', credentials: 'include' },
+        { method: 'POST', credentials: 'include', headers: { 'X-Requested-With': 'XMLHttpRequest' } },
       )
     })
 
