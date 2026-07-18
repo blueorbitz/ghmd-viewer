@@ -20,6 +20,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../Env.php';
 require_once __DIR__ . '/../SessionManager.php';
 require_once __DIR__ . '/../RateLimiter.php';
+require_once __DIR__ . '/../identity_resolver.php';
 
 use GhmdViewer\Env;
 use GhmdViewer\SessionManager;
@@ -128,6 +129,12 @@ if ($githubResponse['status'] !== 'success') {
 // Create session via SessionManager
 $sessionManager = new SessionManager();
 $sessionToken = $sessionManager->createPatSession($token, $scope);
+
+// Resolve GitHub user ID and store in session data (graceful on failure)
+$githubUserId = resolveGitHubUserId($token);
+if ($githubUserId !== null) {
+    $sessionManager->updateSessionData($sessionToken, ['github_user_id' => $githubUserId]);
+}
 
 // Set httpOnly, Secure, SameSite=Strict cookie (24 hours for PAT sessions)
 $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';

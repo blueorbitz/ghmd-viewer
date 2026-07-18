@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Sun, Moon, Monitor, LogOut } from 'lucide-react'
+import { Sun, Moon, Monitor, LogOut, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
 import { useMermaid } from '@/components/MermaidProvider'
@@ -64,18 +64,31 @@ export function Header() {
       </a>
 
       <div className="flex items-center gap-2">
-        {/* Logout button (visible when authenticated) */}
+        {/* Shares link and Logout button (visible when authenticated) */}
         {authService.isAuthenticated() && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            aria-label="Logout"
-            className="gap-1.5 text-xs"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Logout</span>
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="gap-1.5 text-xs"
+            >
+              <a href="#/shares" aria-label="Manage shared links">
+                <Link2 className="h-4 w-4" />
+                <span>Shares</span>
+              </a>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              aria-label="Logout"
+              className="gap-1.5 text-xs"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Logout</span>
+            </Button>
+          </>
         )}
 
         {/* Mermaid rendering toggle */}

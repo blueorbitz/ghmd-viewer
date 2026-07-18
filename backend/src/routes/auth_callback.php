@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../Env.php';
 require_once __DIR__ . '/../SessionManager.php';
+require_once __DIR__ . '/../identity_resolver.php';
 
 use GhmdViewer\Env;
 use GhmdViewer\SessionManager;
@@ -92,8 +93,15 @@ if ($accessToken === null) {
 $refreshToken = $tokenResponse['refresh_token'] ?? null;
 $expiresIn = isset($tokenResponse['expires_in']) ? (int) $tokenResponse['expires_in'] : null;
 
-// Create session storing access token, refresh token, and token expiry
-$sessionToken = $sessionManager->createSession($accessToken, $refreshToken, $expiresIn);
+// Resolve GitHub user ID for share manifest association
+$githubUserId = resolveGitHubUserId($accessToken);
+$extraData = [];
+if ($githubUserId !== null) {
+    $extraData['github_user_id'] = $githubUserId;
+}
+
+// Create session storing access token, refresh token, token expiry, and user ID
+$sessionToken = $sessionManager->createSession($accessToken, $refreshToken, $expiresIn, $extraData);
 
 // Set httpOnly, Secure, SameSite=Lax cookie (24 hours to allow refresh cycles)
 $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';

@@ -6,20 +6,20 @@ This plan implements the share link management lifecycle: identity resolution du
 
 ## Tasks
 
-- [ ] 1. Implement Identity Resolution
-  - [ ] 1.1 Add `resolveGitHubUserId()` helper function and integrate into OAuth callback
+- [x] 1. Implement Identity Resolution
+  - [x] 1.1 Add `resolveGitHubUserId()` helper function and integrate into OAuth callback
     - Create a shared helper function in `backend/src/routes/` (or inline) that calls `GET https://api.github.com/user` with an access token and returns the numeric `id` or `null`
     - Modify `backend/src/routes/auth_callback.php` to call `resolveGitHubUserId()` after token exchange and store `github_user_id` in session data
     - Handle failure gracefully: if the call fails, session is still created without `github_user_id`
     - _Requirements: 1.1, 1.3, 1.4, 1.5_
 
-  - [ ] 1.2 Integrate identity resolution into PAT login
+  - [x] 1.2 Integrate identity resolution into PAT login
     - Modify `backend/src/routes/auth_pat_login.php` to call `resolveGitHubUserId()` after PAT validation and store `github_user_id` in session data
     - Handle failure gracefully: session created without `github_user_id` on failure
     - _Requirements: 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Implement ShareLinkManager class
-  - [ ] 2.1 Create `ShareLinkManager` class with manifest path computation and read/write methods
+- [x] 2. Implement ShareLinkManager class
+  - [x] 2.1 Create `ShareLinkManager` class with manifest path computation and read/write methods
     - Create `backend/src/ShareLinkManager.php` with constructor accepting `SessionManager` and optional sessions directory
     - Implement `getManifestPath(int $githubUserId): string` using `manifest_{sha256(string(github_user_id))}.json`
     - Implement `readManifest(int $githubUserId): array` that decrypts and returns entries, performing orphan cleanup (removing entries whose session file no longer exists)
@@ -28,19 +28,19 @@ This plan implements the share link management lifecycle: identity resolution du
     - Use AES-256-GCM encryption consistent with `SessionManager`
     - _Requirements: 1.6, 2.3, 2.4, 7.1, 7.2, 7.3_
 
-  - [ ] 2.2 Implement `recordShare()` method
+  - [x] 2.2 Implement `recordShare()` method
     - Add `recordShare(int $githubUserId, array $shareEntry): void` to `ShareLinkManager`
     - The share entry must include: token_hash, scope (owner, repo, branch, path), created_at, expires_at, auth_method
     - Read existing manifest (or create new), add entry keyed by token_hash, write back
     - _Requirements: 2.1, 2.2, 2.3_
 
-  - [ ] 2.3 Implement `listShares()` method
+  - [x] 2.3 Implement `listShares()` method
     - Add `listShares(int $githubUserId): array` to `ShareLinkManager`
     - Read manifest, compute status for each entry: "active" if `expires_at >= now` AND session file exists, "expired" otherwise
     - Return array of entries with computed status field
     - _Requirements: 3.1, 3.2, 3.3_
 
-  - [ ] 2.4 Implement `revokeShare()` method
+  - [x] 2.4 Implement `revokeShare()` method
     - Add `revokeShare(int $githubUserId, string $tokenHash): bool` to `ShareLinkManager`
     - Delete the corresponding scoped session file from disk
     - Remove the entry from the manifest
@@ -71,16 +71,16 @@ This plan implements the share link management lifecycle: identity resolution du
     - **Property 9: Empty manifest deletion**
     - **Validates: Requirements 7.3**
 
-- [ ] 3. Integrate ShareLinkManager into share creation flow
-  - [ ] 3.1 Modify `share_create.php` to record share entries in the manifest
+- [x] 3. Integrate ShareLinkManager into share creation flow
+  - [x] 3.1 Modify `share_create.php` to record share entries in the manifest
     - After creating the scoped session, instantiate `ShareLinkManager` and call `recordShare()`
     - Compute the token_hash (SHA-256 of the scoped token) for the share entry
     - Include scope, timestamps, and auth_method from the parent session
     - If session lacks `github_user_id`, return HTTP 503 with appropriate error
     - _Requirements: 2.1, 2.2, 2.5_
 
-- [ ] 4. Implement share management API routes
-  - [ ] 4.1 Create `GET /api/shares` route handler (`share_list.php`)
+- [x] 4. Implement share management API routes
+  - [x] 4.1 Create `GET /api/shares` route handler (`share_list.php`)
     - Validate session cookie, reject with 401 if missing/invalid
     - Reject scoped sessions with 403
     - Check for `github_user_id` in session, return 503 if absent
@@ -88,7 +88,7 @@ This plan implements the share link management lifecycle: identity resolution du
     - Return empty array if no manifest exists
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 6.1, 6.3_
 
-  - [ ] 4.2 Create `POST /api/shares/revoke` route handler (`share_revoke.php`)
+  - [x] 4.2 Create `POST /api/shares/revoke` route handler (`share_revoke.php`)
     - Validate session cookie, reject with 401 if missing/invalid
     - Reject scoped sessions with 403
     - Validate `X-Requested-With: XMLHttpRequest` header (handled globally by router, but verify)
@@ -96,7 +96,7 @@ This plan implements the share link management lifecycle: identity resolution du
     - Call `ShareLinkManager::revokeShare()`, return 404 if not found, 200 with `{"revoked": true}` on success
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 6.1, 6.2, 6.3_
 
-  - [ ] 4.3 Register new routes in `backend/public/index.php`
+  - [x] 4.3 Register new routes in `backend/public/index.php`
     - Add `GET /api/shares` route pointing to `share_list.php`
     - Add `POST /api/shares/revoke` route pointing to `share_revoke.php`
     - _Requirements: 6.1_
@@ -109,23 +109,23 @@ This plan implements the share link management lifecycle: identity resolution du
     - **Property 7: User isolation**
     - **Validates: Requirements 6.4**
 
-- [ ] 5. Checkpoint - Ensure backend is complete
+- [x] 5. Checkpoint - Ensure backend is complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Implement frontend share management
-  - [ ] 6.1 Create share API service (`src/services/share-api.ts`)
+- [x] 6. Implement frontend share management
+  - [x] 6.1 Create share API service (`src/services/share-api.ts`)
     - Define `ShareEntry` interface with token_hash, scope, created_at, expires_at, auth_method, status fields
     - Implement `fetchShares(): Promise<ShareEntry[]>` calling `GET /api/shares` with credentials
     - Implement `revokeShare(tokenHash: string): Promise<void>` calling `POST /api/shares/revoke` with CSRF header
     - Handle error responses (401, 403, 503) appropriately
     - _Requirements: 3.1, 4.1, 5.2_
 
-  - [ ] 6.2 Add `shares` route type to URL state service
+  - [x] 6.2 Add `shares` route type to URL state service
     - Update `Route` type in `src/services/url-state.ts` to include `{ type: 'shares' }`
     - Update `parseHash()` to recognize `#/shares` and return the new route type
     - _Requirements: 5.1_
 
-  - [ ] 6.3 Create `ShareManagementView` component (`src/views/ShareManagementView.tsx`)
+  - [x] 6.3 Create `ShareManagementView` component (`src/views/ShareManagementView.tsx`)
     - Fetch share list from `GET /api/shares` on mount
     - Display each share entry with scope (owner/repo/branch/path), creation date, expiration date, status badge (active/expired), auth method label ("App" for oauth, "PAT" for pat)
     - Provide a revoke button per entry that calls `revokeShare()` and removes entry from list on success
@@ -134,7 +134,7 @@ This plan implements the share link management lifecycle: identity resolution du
     - Handle 503 by showing informational banner
     - _Requirements: 5.2, 5.3, 5.4, 5.5, 5.6_
 
-  - [ ] 6.4 Wire `ShareManagementView` into `App.tsx` routing
+  - [x] 6.4 Wire `ShareManagementView` into `App.tsx` routing
     - Import `ShareManagementView` and render it when route type is `'shares'`
     - Add navigation link to the shares view from the Header or appropriate location
     - _Requirements: 5.1, 5.2_
@@ -156,7 +156,7 @@ This plan implements the share link management lifecycle: identity resolution du
     - **Property 10: List response completeness**
     - **Validates: Requirements 3.2**
 
-- [ ] 7. Final checkpoint - Ensure all tests pass
+- [x] 7. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

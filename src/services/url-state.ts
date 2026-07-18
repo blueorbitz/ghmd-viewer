@@ -23,6 +23,7 @@ export type Route =
   | { type: 'oauth-callback'; params: URLSearchParams }
   | { type: 'share'; payload: string }
   | { type: 'security' }
+  | { type: 'shares' }
 
 /**
  * Encode a navigation state into a URL hash string.
@@ -76,6 +77,11 @@ export function parseHash(hash: string): Route {
   // Security page: #/security
   if (raw === '/security') {
     return { type: 'security' }
+  }
+
+  // Shares management: #/shares
+  if (raw === '/shares') {
+    return { type: 'shares' }
   }
 
   // Reader route: #/{owner}/{repo}/{branch}/{folderPath}?file={filePath}

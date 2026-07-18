@@ -21,8 +21,10 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../SessionManager.php';
+require_once __DIR__ . '/../ShareLinkManager.php';
 
 use GhmdViewer\SessionManager;
+use GhmdViewer\ShareLinkManager;
 
 // Only accept POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -49,6 +51,15 @@ if ($session === null) {
     http_response_code(401);
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Session invalid or expired']);
+    exit;
+}
+
+// Check for github_user_id (required for share manifest recording)
+$githubUserId = $session['github_user_id'] ?? null;
+if ($githubUserId === null) {
+    http_response_code(503);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Share management temporarily unavailable']);
     exit;
 }
 
@@ -106,6 +117,22 @@ $scopedToken = $sessionManager->createScopedSession($accessToken, [
     'branch' => $branch,
     'path' => $path,
 ], $cappedExpiresInHours);
+
+// Record share entry in the user's manifest
+$shareLinkManager = new ShareLinkManager($sessionManager);
+$tokenHash = hash('sha256', $scopedToken);
+$shareLinkManager->recordShare($githubUserId, [
+    'token_hash' => $tokenHash,
+    'scope' => [
+        'owner' => $owner,
+        'repo' => $repo,
+        'branch' => $branch,
+        'path' => $path,
+    ],
+    'created_at' => time(),
+    'expires_at' => $cappedExpiresAt,
+    'auth_method' => $session['auth_method'] ?? 'oauth',
+]);
 
 http_response_code(200);
 header('Content-Type: application/json');

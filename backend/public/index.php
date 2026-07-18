@@ -92,6 +92,18 @@ switch (true) {
         require APP_BASE . '/src/routes/share_redeem.php';
         break;
 
+    case $method === 'POST' && $path === '/api/shares/revoke':
+        require APP_BASE . '/src/routes/share_revoke.php';
+        break;
+
+    case $method === 'GET' && $path === '/api/shares':
+        require APP_BASE . '/src/routes/share_list.php';
+        break;
+
+    case $method === 'POST' && $path === '/api/shares/revoke':
+        require APP_BASE . '/src/routes/share_revoke.php';
+        break;
+
     case $method === 'GET' && $path === '/api/auth/status':
         require APP_BASE . '/src/routes/auth_status.php';
         break;

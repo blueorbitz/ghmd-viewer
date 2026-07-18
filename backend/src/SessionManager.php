@@ -140,8 +140,9 @@ class SessionManager
      * @param string $accessToken The GitHub access token
      * @param string|null $refreshToken The refresh token for renewing expired access tokens
      * @param int|null $tokenExpiresIn Seconds until the access token expires (null = never)
+     * @param array $extraData Optional additional data to merge into session (e.g., github_user_id)
      */
-    public function createSession(string $accessToken, ?string $refreshToken = null, ?int $tokenExpiresIn = null): string
+    public function createSession(string $accessToken, ?string $refreshToken = null, ?int $tokenExpiresIn = null, array $extraData = []): string
     {
         $sessionToken = $this->generateToken();
         $now = time();
@@ -159,6 +160,11 @@ class SessionManager
 
         if ($tokenExpiresIn !== null) {
             $sessionData['token_expires_at'] = $now + $tokenExpiresIn;
+        }
+
+        // Merge any extra data (e.g., github_user_id) into session
+        if (!empty($extraData)) {
+            $sessionData = array_merge($sessionData, $extraData);
         }
 
         file_put_contents(
@@ -400,6 +406,41 @@ class SessionManager
         }
 
         return $session;
+    }
+
+    /**
+     * Update an existing session with additional data fields.
+     * Reads the session file, merges extra data, and rewrites it.
+     *
+     * @param string $sessionToken The session token identifying the session file
+     * @param array $extraData Key-value pairs to merge into the session data
+     */
+    public function updateSessionData(string $sessionToken, array $extraData): void
+    {
+        $path = $this->getSessionPath($sessionToken);
+
+        if (!file_exists($path)) {
+            return;
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return;
+        }
+
+        $session = $this->decryptSessionData($content);
+        if ($session === null) {
+            return;
+        }
+
+        // Merge extra data into existing session
+        $session = array_merge($session, $extraData);
+
+        file_put_contents(
+            $path,
+            $this->encryptSessionData($session),
+            LOCK_EX
+        );
     }
 
     /**
