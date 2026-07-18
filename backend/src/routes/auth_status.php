@@ -8,10 +8,11 @@ declare(strict_types=1);
  * Returns the current authentication status based on the session cookie.
  *
  * Response:
- *   { "authenticated": true }  — valid, non-expired session exists
- *   { "authenticated": false } — no session or expired session
+ *   { "authenticated": true, "auth_method": "oauth" }  — valid OAuth session
+ *   { "authenticated": true, "auth_method": "pat" }    — valid PAT session
+ *   { "authenticated": false }                         — no session or expired session
  *
- * Requirements: 3.2, 5.3
+ * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5
  */
 
 require_once __DIR__ . '/../SessionManager.php';
@@ -39,5 +40,15 @@ if ($session === null) {
     exit;
 }
 
+// Include auth_method from session data, defaulting to "oauth" for backward compatibility
+$authMethod = $session['auth_method'] ?? 'oauth';
+
+// Include app install URL so the frontend can prompt installation if needed
+$appSlug = \GhmdViewer\Env::get('GITHUB_APP_SLUG');
+$response = ['authenticated' => true, 'auth_method' => $authMethod];
+if (!empty($appSlug)) {
+    $response['app_install_url'] = "https://github.com/apps/{$appSlug}/installations/new";
+}
+
 http_response_code(200);
-echo json_encode(['authenticated' => true]);
+echo json_encode($response);

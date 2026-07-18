@@ -1,7 +1,9 @@
-import { Sun, Moon, Monitor } from 'lucide-react'
+import { useMemo } from 'react'
+import { Sun, Moon, Monitor, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
 import { useMermaid } from '@/components/MermaidProvider'
+import { createAuthService } from '@/services/auth-service'
 import type { ThemePreference } from '@/types/app'
 
 const THEME_CYCLE: ThemePreference[] = ['light', 'dark', 'system']
@@ -36,9 +38,16 @@ function getThemeLabel(preference: ThemePreference): string {
 export function Header() {
   const { theme, setTheme } = useTheme()
   const { mermaidEnabled, toggleMermaid } = useMermaid()
+  const authService = useMemo(() => createAuthService(), [])
 
   const handleThemeCycle = () => {
     setTheme(getNextTheme(theme))
+  }
+
+  const handleLogout = async () => {
+    await authService.logout()
+    window.location.hash = ''
+    window.location.reload()
   }
 
   return (
@@ -55,6 +64,20 @@ export function Header() {
       </a>
 
       <div className="flex items-center gap-2">
+        {/* Logout button (visible when authenticated) */}
+        {authService.isAuthenticated() && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleLogout}
+            aria-label="Logout"
+            className="gap-1.5 text-xs"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Logout</span>
+          </Button>
+        )}
+
         {/* Mermaid rendering toggle */}
         <Button
           variant="ghost"

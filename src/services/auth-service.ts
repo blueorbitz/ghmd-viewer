@@ -127,6 +127,84 @@ export function createAuthService(): AuthService {
   }
 
   /**
+   * Login with a Personal Access Token by sending it to the backend
+   * for validation against the GitHub API.
+   *
+   * The PAT is transmitted only in the request body and is never persisted
+   * client-side. On success, the backend sets a session cookie and we
+   * update the local auth flag.
+   *
+   * Requirements: 3.4, 3.5, 3.6, 3.7, 5.5, 5.6
+   */
+  async function loginWithPat(
+    token: string,
+    scope?: { owner: string; repo: string },
+  ): Promise<AuthResult> {
+    if (!backendUrl) {
+      return {
+        success: false,
+        error: 'pat_login_failed',
+        message: 'Auth backend URL is not configured',
+      };
+    }
+
+    try {
+      const body: { token: string; scope?: { owner: string; repo: string } } = { token };
+      if (scope) {
+        body.scope = scope;
+      }
+
+      const response = await fetch(`${backendUrl}/api/auth/pat-login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        let message = `PAT login failed with status ${response.status}`;
+        try {
+          const data = await response.json();
+          if (data.error && typeof data.error === 'string') {
+            message = data.error;
+          }
+        } catch {
+          // Could not parse error body, use default message
+        }
+        return {
+          success: false,
+          error: 'pat_login_failed',
+          message,
+        };
+      }
+
+      const data = await response.json();
+
+      if (data.authenticated) {
+        localStorage.setItem(STORAGE_KEY, 'true');
+        return { success: true };
+      }
+
+      return {
+        success: false,
+        error: 'pat_login_failed',
+        message: 'Authentication was not confirmed by the backend',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'pat_login_failed',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Unable to reach the server. Check your connection and try again.',
+      };
+    }
+  }
+
+  /**
    * Check if private repo features are available.
    * Returns true only when VITE_AUTH_BACKEND_URL is configured and non-empty.
    */
@@ -137,6 +215,7 @@ export function createAuthService(): AuthService {
   return {
     initiateOAuth,
     handleOAuthCallback,
+    loginWithPat,
     isAuthenticated,
     logout,
     getBackendUrl: () => backendUrl,

@@ -63,6 +63,10 @@ switch (true) {
         require APP_BASE . '/src/routes/auth_callback.php';
         break;
 
+    case $method === 'POST' && $path === '/api/auth/pat-login':
+        require APP_BASE . '/src/routes/auth_pat_login.php';
+        break;
+
     case $method === 'POST' && $path === '/api/auth/logout':
         require APP_BASE . '/src/routes/auth_logout.php';
         break;
@@ -77,6 +81,10 @@ switch (true) {
 
     case $method === 'GET' && $path === '/api/auth/status':
         require APP_BASE . '/src/routes/auth_status.php';
+        break;
+
+    case $method === 'POST' && $path === '/api/auth/pat-login':
+        require APP_BASE . '/src/routes/auth_pat_login.php';
         break;
 
     // Proxy routes

@@ -41,7 +41,7 @@ $cookieOptions = [
     'path' => '/',
     'httponly' => true,
     'secure' => $secure,
-    'samesite' => 'Strict',
+    'samesite' => 'Lax',
 ];
 setcookie('session_token', '', $cookieOptions);
 

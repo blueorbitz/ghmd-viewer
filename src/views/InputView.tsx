@@ -1,9 +1,138 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { PatLoginForm } from '@/components/PatLoginForm'
 import { parseGitHubUrl } from '@/services/github-url-parser'
 import { fetchPublicContents, fetchPrivateContents } from '@/services/github-service'
 import { navigateToHash } from '@/services/url-state'
 import { createAuthService } from '@/services/auth-service'
+import type { AuthService } from '@/types/auth'
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface SubmitError {
+  message: string
+  suggestAuth: boolean
+  suggestInstall: boolean
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Classify a fetch error into a user-friendly message and whether to show
+ * the authentication prompt or the app install prompt.
+ */
+function classifyFetchError(err: unknown, isAuthenticated: boolean): SubmitError {
+  const message = err instanceof Error ? err.message : 'Unknown error'
+
+  if (message.includes('directory listing but received a file response')) {
+    return { message: 'The URL points to a file, not a folder. Please provide a folder URL.', suggestAuth: false, suggestInstall: false }
+  }
+  if (message.includes('Folder not found')) {
+    if (isAuthenticated) {
+      return { message: 'Folder not found. You may need to grant the app access to this repository.', suggestAuth: false, suggestInstall: true }
+    }
+    return { message: 'Repository or folder not found. Check the URL, or it may be a private repository.', suggestAuth: true, suggestInstall: false }
+  }
+  if (message.includes('rate limit')) {
+    return { message: 'GitHub API rate limit reached. Please try again later or authenticate for higher limits.', suggestAuth: true, suggestInstall: false }
+  }
+
+  const lower = message.toLowerCase()
+  if (lower.includes('session') || lower.includes('expired') || lower.includes('authentication required')) {
+    return { message, suggestAuth: true, suggestInstall: false }
+  }
+
+  return { message, suggestAuth: false, suggestInstall: false }
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function Spinner() {
+  return (
+    <svg
+      className="animate-spin h-4 w-4"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  )
+}
+
+function Header({ authService }: { authService: AuthService }) {
+  return (
+    <div>
+      <h1 className="text-3xl font-semibold tracking-tight">GitHub Markdown Viewer</h1>
+      <p className="text-muted-foreground mt-2">
+        Paste a GitHub folder URL to browse and read Markdown files
+      </p>
+      {authService.isAuthenticated() && (
+        <button
+          type="button"
+          onClick={async () => {
+            await authService.logout()
+            window.location.reload()
+          }}
+          className="mt-2 text-xs text-muted-foreground underline hover:text-foreground transition-colors"
+        >
+          Logout current session
+        </button>
+      )}
+    </div>
+  )
+}
+
+function AuthPromptButtons({
+  authService,
+  showPatForm,
+  onShowPatForm,
+  onError,
+  onSubmit,
+}: {
+  authService: AuthService
+  showPatForm: boolean
+  onShowPatForm: (show: boolean) => void
+  onError: (msg: string) => void
+  onSubmit: () => void
+}) {
+  function handleConnectGitHub() {
+    try {
+      authService.initiateOAuth(window.location.hash || '/')
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Failed to initiate OAuth')
+    }
+  }
+
+  if (showPatForm) {
+    return (
+      <PatLoginForm
+        onSuccess={() => {
+          onShowPatForm(false)
+          onSubmit()
+        }}
+        onCancel={() => onShowPatForm(false)}
+      />
+    )
+  }
+
+  return (
+    <div className="flex gap-2">
+      {authService.getBackendUrl() && (
+        <Button variant="outline" size="sm" onClick={handleConnectGitHub}>
+          Connect GitHub
+        </Button>
+      )}
+      <Button variant="outline" size="sm" onClick={() => onShowPatForm(true)}>
+        Use Personal Access Token
+      </Button>
+    </div>
+  )
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
 
 /**
  * InputView — The landing page where users paste a GitHub folder URL.
@@ -16,65 +145,73 @@ export function InputView() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showAuthPrompt, setShowAuthPrompt] = useState(false)
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false)
+  const [showPatForm, setShowPatForm] = useState(false)
+  const [appInstallUrl, setAppInstallUrl] = useState<string | null>(null)
 
   const authService = useMemo(() => createAuthService(), [])
-
   const isSubmitDisabled = !url.trim() || isLoading
+
+  // Fetch the app install URL when authenticated
+  useEffect(() => {
+    if (!authService.isAuthenticated()) return
+    const backendUrl = authService.getBackendUrl()
+    if (!backendUrl) return
+
+    fetch(`${backendUrl}/api/auth/status`, { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.app_install_url) {
+          setAppInstallUrl(data.app_install_url)
+        }
+      })
+      .catch(() => {})
+  }, [authService])
+
+  // ─── Actions ─────────────────────────────────────────────────────────────
+
+  function clearError() {
+    setError(null)
+    setShowAuthPrompt(false)
+    setShowInstallPrompt(false)
+    setShowPatForm(false)
+  }
+
+  function showError(message: string, suggestAuth = false, suggestInstall = false) {
+    setError(message)
+    setShowAuthPrompt(suggestAuth)
+    setShowInstallPrompt(suggestInstall)
+  }
 
   async function handleSubmit() {
     const trimmedUrl = url.trim()
     if (!trimmedUrl) return
 
-    setError(null)
+    clearError()
     setIsLoading(true)
 
     try {
-      // Step 1: Parse the URL
+      // 1. Parse the URL
       const parsed = parseGitHubUrl(trimmedUrl)
       if (!parsed) {
-        setError(
-          'Invalid URL format. Expected: https://github.com/{owner}/{repo}/tree/{branch}/{path}',
-        )
-        setIsLoading(false)
+        showError('Invalid URL format. Expected: https://github.com/{owner}/{repo}/tree/{branch}/{path}')
         return
       }
 
-      // Step 2: Try to fetch the folder contents directly.
-      // If the user is authenticated, use private access (higher rate limits + private repos).
-      // Otherwise, try public access first.
-      const usePrivateAccess = authService.isPrivateAccessAvailable() && authService.isAuthenticated()
-
+      // 2. Verify the folder is accessible
       try {
-        if (usePrivateAccess) {
+        if (authService.isAuthenticated()) {
           await fetchPrivateContents(parsed.owner, parsed.repo, parsed.path, parsed.branch)
         } else {
           await fetchPublicContents(parsed.owner, parsed.repo, parsed.path, parsed.branch)
         }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
-        if (message.includes('directory listing but received a file response')) {
-          setError('The URL points to a file, not a folder. Please provide a folder URL.')
-          setIsLoading(false)
-          return
-        }
-        if (message.includes('Folder not found')) {
-          setError('Repository or folder not found. Check the URL, or it may be a private repository.')
-          setShowAuthPrompt(authService.isPrivateAccessAvailable() && !authService.isAuthenticated())
-          setIsLoading(false)
-          return
-        }
-        if (message.includes('rate limit')) {
-          setError('GitHub API rate limit reached. Please try again later or authenticate for higher limits.')
-          setShowAuthPrompt(true)
-          setIsLoading(false)
-          return
-        }
-        setError(message)
-        setIsLoading(false)
+      } catch (fetchErr) {
+        const classified = classifyFetchError(fetchErr, authService.isAuthenticated())
+        showError(classified.message, classified.suggestAuth, classified.suggestInstall)
         return
       }
 
-      // Step 3: Navigate to reader view
+      // 3. Navigate to reader view
       navigateToHash({
         owner: parsed.owner,
         repo: parsed.repo,
@@ -82,7 +219,7 @@ export function InputView() {
         folderPath: parsed.path,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
+      showError(err instanceof Error ? err.message : 'An unexpected error occurred.')
     } finally {
       setIsLoading(false)
     }
@@ -94,27 +231,24 @@ export function InputView() {
     }
   }
 
+  function handleUrlChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setUrl(e.target.value)
+    if (error) clearError()
+  }
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
       <div className="w-full max-w-xl space-y-6 text-center">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">GitHub Markdown Viewer</h1>
-          <p className="text-muted-foreground mt-2">
-            Paste a GitHub folder URL to browse and read Markdown files
-          </p>
-        </div>
+        <Header authService={authService} />
 
+        {/* URL Input */}
         <div className="flex gap-2">
           <input
             type="text"
             value={url}
-            onChange={(e) => {
-              setUrl(e.target.value)
-              if (error) {
-                setError(null)
-                setShowAuthPrompt(false)
-              }
-            }}
+            onChange={handleUrlChange}
             onKeyDown={handleKeyDown}
             placeholder="https://github.com/owner/repo/tree/main/docs"
             disabled={isLoading}
@@ -123,34 +257,10 @@ export function InputView() {
             aria-invalid={!!error}
             aria-describedby={error ? 'url-error' : undefined}
           />
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitDisabled}
-            aria-label="Submit URL"
-          >
+          <Button onClick={handleSubmit} disabled={isSubmitDisabled} aria-label="Submit URL">
             {isLoading ? (
               <span className="flex items-center gap-2">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
+                <Spinner />
                 Checking…
               </span>
             ) : (
@@ -159,30 +269,39 @@ export function InputView() {
           </Button>
         </div>
 
+        {/* Error + Auth/Install prompt */}
         {error && (
-          <div className="text-left space-y-2">
-            <p
-              id="url-error"
-              role="alert"
-              className="text-sm text-destructive"
-            >
+          <div className="space-y-2 text-center">
+            <p id="url-error" role="alert" className="text-sm text-destructive">
               {error}
             </p>
-            {showAuthPrompt && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (authService.isPrivateAccessAvailable()) {
-                    authService.initiateOAuth(window.location.hash || '/')
-                  } else {
-                    setError('Authentication backend is not configured. Set VITE_AUTH_BACKEND_URL to enable GitHub login.')
-                    setShowAuthPrompt(false)
-                  }
-                }}
-              >
-                Connect GitHub
-              </Button>
+            {showAuthPrompt && !authService.isAuthenticated() && (
+              <div className="flex justify-center">
+                <AuthPromptButtons
+                  authService={authService}
+                  showPatForm={showPatForm}
+                  onShowPatForm={setShowPatForm}
+                  onError={(msg) => showError(msg, false)}
+                  onSubmit={() => {
+                    clearError()
+                    handleSubmit()
+                  }}
+                />
+              </div>
+            )}
+            {showInstallPrompt && appInstallUrl && (
+              <div className="flex flex-col items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(appInstallUrl, '_blank', 'noopener')}
+                >
+                  Grant Repository Access
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Opens GitHub in a new window. Come back and retry after granting access.
+                </span>
+              </div>
             )}
           </div>
         )}

@@ -128,17 +128,154 @@ class SessionManager
     /**
      * Create a new session with the given access token.
      * Returns the session token string.
+     *
+     * @param string $accessToken The GitHub access token
+     * @param string|null $refreshToken The refresh token for renewing expired access tokens
+     * @param int|null $tokenExpiresIn Seconds until the access token expires (null = never)
      */
-    public function createSession(string $accessToken): string
+    public function createSession(string $accessToken, ?string $refreshToken = null, ?int $tokenExpiresIn = null): string
     {
         $sessionToken = $this->generateToken();
         $now = time();
 
         $sessionData = [
             'installation_token' => $accessToken,
+            'auth_method' => 'oauth',
             'created_at' => $now,
-            'expires_at' => $now + 3600, // 1 hour
+            'expires_at' => $now + 86400, // Session valid for 24 hours
         ];
+
+        if ($refreshToken !== null) {
+            $sessionData['refresh_token'] = $refreshToken;
+        }
+
+        if ($tokenExpiresIn !== null) {
+            $sessionData['token_expires_at'] = $now + $tokenExpiresIn;
+        }
+
+        file_put_contents(
+            $this->getSessionPath($sessionToken),
+            json_encode($sessionData, JSON_THROW_ON_ERROR),
+            LOCK_EX
+        );
+
+        return $sessionToken;
+    }
+
+    /**
+     * Check if the access token in a session needs refreshing.
+     * Returns true if token_expires_at is set and the token expires within 5 minutes.
+     */
+    public function isTokenExpired(array $session): bool
+    {
+        $tokenExpiresAt = $session['token_expires_at'] ?? null;
+        if ($tokenExpiresAt === null) {
+            return false; // No expiry tracked, assume valid
+        }
+        // Refresh if less than 5 minutes remaining
+        return time() >= ($tokenExpiresAt - 300);
+    }
+
+    /**
+     * Refresh the access token using the stored refresh token.
+     * Updates the session file with the new access token and expiry.
+     *
+     * @param string $sessionToken The session token (used to locate the session file)
+     * @param array $session The current session data
+     * @param string $clientId GitHub App client ID
+     * @param string $clientSecret GitHub App client secret
+     * @return array|null Updated session data on success, null on failure
+     */
+    public function refreshAccessToken(string $sessionToken, array $session, string $clientId, string $clientSecret): ?array
+    {
+        $refreshToken = $session['refresh_token'] ?? null;
+        if ($refreshToken === null) {
+            return null;
+        }
+
+        $url = 'https://github.com/login/oauth/access_token';
+        $postData = http_build_query([
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'grant_type' => 'refresh_token',
+            'refresh_token' => $refreshToken,
+        ]);
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'POST',
+                'header' => implode("\r\n", [
+                    'Accept: application/json',
+                    'Content-Type: application/x-www-form-urlencoded',
+                    'User-Agent: ghmd-viewer-backend',
+                ]),
+                'content' => $postData,
+                'timeout' => 30,
+            ],
+        ]);
+
+        $response = @file_get_contents($url, false, $context);
+        if ($response === false) {
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        if (!is_array($data) || isset($data['error']) || !isset($data['access_token'])) {
+            return null;
+        }
+
+        // Update session with new tokens
+        $now = time();
+        $session['installation_token'] = $data['access_token'];
+
+        if (isset($data['expires_in'])) {
+            $session['token_expires_at'] = $now + (int) $data['expires_in'];
+        }
+
+        if (isset($data['refresh_token'])) {
+            $session['refresh_token'] = $data['refresh_token'];
+        }
+
+        // Persist updated session
+        file_put_contents(
+            $this->getSessionPath($sessionToken),
+            json_encode($session, JSON_THROW_ON_ERROR),
+            LOCK_EX
+        );
+
+        return $session;
+    }
+
+    /**
+     * Create a new PAT-based session.
+     * Returns the session token string.
+     *
+     * @param string $pat The GitHub Personal Access Token
+     * @param array|null $scope Optional scope restriction with keys: owner, repo
+     * @throws \InvalidArgumentException If the PAT is empty or whitespace-only
+     */
+    public function createPatSession(string $pat, ?array $scope = null): string
+    {
+        if (trim($pat) === '') {
+            throw new \InvalidArgumentException('A valid PAT is required');
+        }
+
+        $sessionToken = $this->generateToken();
+        $now = time();
+
+        $sessionData = [
+            'installation_token' => $pat,
+            'auth_method' => 'pat',
+            'created_at' => $now,
+            'expires_at' => $now + 86400, // 24 hours
+        ];
+
+        if ($scope !== null) {
+            $sessionData['scope'] = [
+                'owner' => $scope['owner'],
+                'repo' => $scope['repo'],
+            ];
+        }
 
         file_put_contents(
             $this->getSessionPath($sessionToken),
@@ -204,6 +341,11 @@ class SessionManager
         // Owner and repo must match exactly
         if ($scope['owner'] !== $owner || $scope['repo'] !== $repo) {
             return false;
+        }
+
+        // If scope has no path key (PAT sessions), allow any path within the repo
+        if (!isset($scope['path']) || $scope['path'] === '') {
+            return true;
         }
 
         // Path must be within the scoped path (equal or a subpath)
