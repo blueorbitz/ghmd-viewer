@@ -52,6 +52,22 @@ if ($installationToken === null || $installationToken === '') {
     exit;
 }
 
+// --- 3b. Refresh token if expired ---
+if ($sessionManager->isTokenExpired($session)) {
+    $clientId = \GhmdViewer\Env::get('GITHUB_CLIENT_ID');
+    $clientSecret = \GhmdViewer\Env::get('GITHUB_CLIENT_SECRET');
+
+    $refreshed = $sessionManager->refreshAccessToken($sessionToken, $session, $clientId, $clientSecret);
+    if ($refreshed === null) {
+        http_response_code(401);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Session expired and token refresh failed. Please re-authenticate.']);
+        exit;
+    }
+    $session = $refreshed;
+    $installationToken = $session['installation_token'];
+}
+
 // --- 4. Parse {owner}/{repo}/{path} from request URI ---
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $uriPath = parse_url($requestUri, PHP_URL_PATH);
@@ -85,7 +101,7 @@ $path = $parts[2];
 if (!$sessionManager->isWithinScope($session, $owner, $repo, $path)) {
     http_response_code(403);
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'Access denied: this session is restricted to a specific repository path']);
+    echo json_encode(['error' => 'Session is restricted to a specific repository path']);
     exit;
 }
 
@@ -138,7 +154,8 @@ if ($curlErrno !== 0) {
 
     http_response_code(502);
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'Failed to connect to GitHub', 'detail' => $curlError]);
+    error_log('proxy_raw: curl error ' . $curlErrno . ': ' . $curlError);
+    echo json_encode(['error' => 'Failed to connect to GitHub']);
     exit;
 }
 

@@ -21,8 +21,10 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../SessionManager.php';
+require_once __DIR__ . '/../ShareLinkManager.php';
 
 use GhmdViewer\SessionManager;
+use GhmdViewer\ShareLinkManager;
 
 // Only accept POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -49,6 +51,15 @@ if ($session === null) {
     http_response_code(401);
     header('Content-Type: application/json');
     echo json_encode(['error' => 'Session invalid or expired']);
+    exit;
+}
+
+// Check for github_user_id (required for share manifest recording)
+$githubUserId = $session['github_user_id'] ?? null;
+if ($githubUserId === null) {
+    http_response_code(503);
+    header('Content-Type: application/json');
+    echo json_encode(['error' => 'Share management temporarily unavailable']);
     exit;
 }
 
@@ -92,12 +103,36 @@ if ($accessToken === '') {
     exit;
 }
 
+// Cap scoped session expiry to never exceed the parent session's expiry.
+// This ensures that when the parent session expires (or is logged out and purged),
+// the scoped session cannot outlive the token's expected lifetime.
+$parentExpiresAt = $session['expires_at'] ?? (time() + 3600);
+$requestedExpiresAt = time() + ($expiresInHours * 3600);
+$cappedExpiresAt = min($requestedExpiresAt, $parentExpiresAt);
+$cappedExpiresInHours = max(1, (int) ceil(($cappedExpiresAt - time()) / 3600));
+
 $scopedToken = $sessionManager->createScopedSession($accessToken, [
     'owner' => $owner,
     'repo' => $repo,
     'branch' => $branch,
     'path' => $path,
-], $expiresInHours);
+], $cappedExpiresInHours);
+
+// Record share entry in the user's manifest
+$shareLinkManager = new ShareLinkManager($sessionManager);
+$tokenHash = hash('sha256', $scopedToken);
+$shareLinkManager->recordShare($githubUserId, [
+    'token_hash' => $tokenHash,
+    'scope' => [
+        'owner' => $owner,
+        'repo' => $repo,
+        'branch' => $branch,
+        'path' => $path,
+    ],
+    'created_at' => time(),
+    'expires_at' => $cappedExpiresAt,
+    'auth_method' => $session['auth_method'] ?? 'oauth',
+]);
 
 http_response_code(200);
 header('Content-Type: application/json');

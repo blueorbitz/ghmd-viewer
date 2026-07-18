@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../Env.php';
 require_once __DIR__ . '/../SessionManager.php';
+require_once __DIR__ . '/../identity_resolver.php';
 
 use GhmdViewer\Env;
 use GhmdViewer\SessionManager;
@@ -88,17 +89,28 @@ if ($accessToken === null) {
     exit;
 }
 
-// Create session with 1-hour expiry
-$sessionToken = $sessionManager->createSession($accessToken);
+// Extract refresh token and expiry (GitHub App user tokens expire after ~8 hours)
+$refreshToken = $tokenResponse['refresh_token'] ?? null;
+$expiresIn = isset($tokenResponse['expires_in']) ? (int) $tokenResponse['expires_in'] : null;
 
-// Set httpOnly, Secure, SameSite=Strict cookie
+// Resolve GitHub user ID for share manifest association
+$githubUserId = resolveGitHubUserId($accessToken);
+$extraData = [];
+if ($githubUserId !== null) {
+    $extraData['github_user_id'] = $githubUserId;
+}
+
+// Create session storing access token, refresh token, token expiry, and user ID
+$sessionToken = $sessionManager->createSession($accessToken, $refreshToken, $expiresIn, $extraData);
+
+// Set httpOnly, Secure, SameSite=Lax cookie (24 hours to allow refresh cycles)
 $secure = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 setcookie('session_token', $sessionToken, [
-    'expires' => time() + 3600,
+    'expires' => time() + 86400,
     'path' => '/',
     'secure' => $secure,
     'httponly' => true,
-    'samesite' => 'Strict',
+    'samesite' => 'Lax',
 ]);
 
 // Redirect back to SPA OAuth callback route so the frontend can verify and store auth state
