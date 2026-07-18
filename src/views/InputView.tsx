@@ -328,6 +328,10 @@ export function InputView() {
         <a href="#/security" className="hover:text-foreground transition-colors underline">
           Security
         </a>
+        <span className="mx-2">·</span>
+        <a href="https://github.com/blueorbitz/ghmd-viewer/issues" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors underline">
+          Feedback
+        </a>
         <p className="mt-1">&copy; {new Date().getFullYear()} GitHub Markdown Viewer</p>
       </footer>
     </div>
