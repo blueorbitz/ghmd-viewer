@@ -5,6 +5,7 @@ import { InputView } from '@/views/InputView'
 import { ReaderView } from '@/views/ReaderView'
 import { OAuthCallbackView } from '@/views/OAuthCallbackView'
 import { SharePassphrasePrompt } from '@/views/SharePassphrasePrompt'
+import { SecurityView } from '@/views/SecurityView'
 
 function AppRouter() {
   const route = useHashRouter()
@@ -18,6 +19,8 @@ function AppRouter() {
       return <OAuthCallbackView params={route.params} />
     case 'share':
       return <SharePassphrasePrompt payload={route.payload} />
+    case 'security':
+      return <SecurityView />
   }
 }
 

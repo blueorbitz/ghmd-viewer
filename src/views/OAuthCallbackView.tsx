@@ -8,7 +8,7 @@ interface OAuthCallbackViewProps {
 
 type CallbackState =
   | { status: 'loading' }
-  | { status: 'error'; errorType: 'cancelled' | 'state_mismatch' | 'exchange_failed' | 'unknown'; message: string }
+  | { status: 'error'; errorType: 'cancelled' | 'state_mismatch' | 'exchange_failed' | 'pat_login_failed' | 'unknown'; message: string }
 
 /**
  * OAuthCallbackView — Handles the OAuth redirect callback from GitHub.

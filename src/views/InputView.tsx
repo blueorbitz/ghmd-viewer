@@ -255,8 +255,8 @@ export function InputView() {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <div className="w-full max-w-xl space-y-6 text-center">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="w-full max-w-xl space-y-6 text-center flex-1 flex flex-col justify-center">
         <Header authService={authService} />
 
         {/* URL Input */}
@@ -323,6 +323,13 @@ export function InputView() {
           </div>
         )}
       </div>
+
+      <footer className="w-full py-4 text-center text-xs text-muted-foreground">
+        <a href="#/security" className="hover:text-foreground transition-colors underline">
+          Security
+        </a>
+        <p className="mt-1">&copy; {new Date().getFullYear()} GitHub Markdown Viewer</p>
+      </footer>
     </div>
   )
 }

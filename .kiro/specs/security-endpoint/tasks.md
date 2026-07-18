@@ -6,8 +6,8 @@ Add a `#/security` hash route that renders a static `SECURITY.md` file from the 
 
 ## Tasks
 
-- [ ] 1. Add security route type and parsing
-  - [ ] 1.1 Extend the Route type and parseHash function in `src/services/url-state.ts`
+- [x] 1. Add security route type and parsing
+  - [x] 1.1 Extend the Route type and parseHash function in `src/services/url-state.ts`
     - Add `{ type: 'security' }` variant to the `Route` union type
     - Add an exact-match check for `/security` in `parseHash`, placed before the reader route logic
     - Ensure only the exact string `/security` triggers the route (not `/securityx` or `/security/foo`)
@@ -24,8 +24,8 @@ Add a `#/security` hash route that renders a static `SECURITY.md` file from the 
     - Verify OAuth callback and share routes still parse correctly
     - **Validates: Requirements 1.1**
 
-- [ ] 2. Create SecurityView component and wire routing
-  - [ ] 2.1 Create `src/views/SecurityView.tsx`
+- [x] 2. Create SecurityView component and wire routing
+  - [x] 2.1 Create `src/views/SecurityView.tsx`
     - Implement the SecurityView component that fetches `/SECURITY.md` on mount
     - Use a loading/success/error state machine pattern (`loading | success | error`)
     - Render content using `MarkdownRenderer` with `mermaidEnabled={true}`
@@ -34,16 +34,16 @@ Add a `#/security` hash route that renders a static `SECURITY.md` file from the 
     - Include the `Header` component for consistent navigation
     - _Requirements: 1.3, 2.1, 2.2, 2.3, 2.4_
 
-  - [ ] 2.2 Add security route case to AppRouter in `src/App.tsx`
+  - [x] 2.2 Add security route case to AppRouter in `src/App.tsx`
     - Import `SecurityView` from `@/views/SecurityView`
     - Add `case 'security': return <SecurityView />` to the route switch
     - _Requirements: 1.2_
 
-- [ ] 3. Checkpoint
+- [x] 3. Checkpoint
   - Ensure the app builds without TypeScript errors (`tsc -b && vite build`). Ask the user if questions arise.
 
-- [ ] 4. Create SECURITY.md content file
-  - [ ] 4.1 Create `public/SECURITY.md` with security documentation
+- [x] 4. Create SECURITY.md content file
+  - [x] 4.1 Create `public/SECURITY.md` with security documentation
     - Write an overview section introducing the security architecture
     - Document the GitHub App OAuth flow: authorization redirect → code exchange → session creation
     - Document the PAT authentication option: token validation against GitHub API → session creation
@@ -69,7 +69,7 @@ Add a `#/security` hash route that renders a static `SECURITY.md` file from the 
     - Verify total node count ≤ 10
     - **Validates: Requirements 5.5**
 
-- [ ] 5. Final checkpoint
+- [x] 5. Final checkpoint
   - Ensure the app builds successfully, the `#/security` route renders correctly, the Mermaid diagram displays as SVG, and all tests pass (`pnpm test`). Ask the user if questions arise.
 
 ## Notes
