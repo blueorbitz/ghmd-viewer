@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { isValidElement, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -7,11 +8,27 @@ import { isExternalLink, isRelativeMarkdownLink, resolveRelativePath } from '@/s
 import { useTheme } from '@/components/ThemeProvider'
 import { MermaidDiagramRenderer } from '@/components/MermaidDiagramRenderer'
 import { MarkdownImage } from '@/components/MarkdownImage'
+import { CodeBlockWrapper } from '@/components/CodeBlockWrapper'
 import { FrontmatterTable, parseFrontmatter } from '@/components/FrontmatterTable'
 
 import 'highlight.js/styles/github.css'
 import 'highlight.js/styles/github-dark.css'
 import './MarkdownRenderer.css'
+
+/**
+ * Recursively extracts plain text from a React node tree.
+ * Handles strings, numbers, arrays, and React elements (e.g., <span> from rehype-highlight).
+ */
+function extractTextFromNode(node: ReactNode): string {
+  if (node == null || typeof node === 'boolean') return ''
+  if (typeof node === 'string') return node
+  if (typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(extractTextFromNode).join('')
+  if (isValidElement(node)) {
+    return extractTextFromNode(node.props.children)
+  }
+  return ''
+}
 
 export interface MarkdownRendererProps {
   content: string
@@ -121,7 +138,7 @@ export function MarkdownRenderer({
       pre: ({ children, ...props }) => {
         // If the child is a MermaidDiagramRenderer (rendered from mermaid code block),
         // or a code element with language-mermaid class, render it without wrapping in <pre>
-        const child = children as React.ReactElement<{ className?: string }>
+        const child = children as React.ReactElement<{ className?: string; children?: React.ReactNode }>
         if (child && typeof child === 'object' && 'props' in child) {
           const childClassName = child.props?.className || ''
           // Check for mermaid language class or if child is already a MermaidDiagramRenderer
@@ -134,7 +151,20 @@ export function MarkdownRenderer({
             return <>{children}</>
           }
         }
-        return <pre {...props}>{children}</pre>
+
+        // For non-mermaid fenced code blocks, wrap with CodeBlockWrapper
+        // Extract raw text by recursively walking the React element tree
+        // (rehype-highlight wraps tokens in <span> elements)
+        let rawText = ''
+        if (child && typeof child === 'object' && 'props' in child) {
+          rawText = extractTextFromNode(child.props?.children).replace(/\n$/, '')
+        }
+
+        return (
+          <CodeBlockWrapper rawText={rawText}>
+            <pre {...props}>{children}</pre>
+          </CodeBlockWrapper>
+        )
       },
 
       // Custom image component with URL resolution and error handling

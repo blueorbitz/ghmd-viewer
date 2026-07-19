@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { HashState } from '@/services/url-state'
 import { navigateToHash } from '@/services/url-state'
 import { discoverSupportedFilesShallow, fetchDirectoryChildren, fetchFileContent, fetchPublicContents, fetchPrivateContents, fetchPrivateFileContent, fetchPdfContent, fetchPrivatePdfContent } from '@/services/github-service'
@@ -6,8 +6,9 @@ import { getFileType } from '@/lib/file-type'
 import { Header } from '@/components/Header'
 import { Sidebar } from '@/components/Sidebar'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
+import { RawMarkdownView } from '@/components/RawMarkdownView'
 import { PdfViewer } from '@/components/PdfViewer'
-import { useMermaid } from '@/components/MermaidProvider'
+import { useViewSettings } from '@/components/ViewSettingsProvider'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { ShareCreateView } from '@/views/ShareCreateView'
@@ -29,8 +30,11 @@ interface ReaderViewProps {
 export function ReaderView({ state }: ReaderViewProps) {
   const { owner, repo, branch, folderPath, file } = state
 
-  // Get mermaid enabled state from context (provided by App-level MermaidProvider)
-  const { mermaidEnabled } = useMermaid()
+  // Get view settings from context (provided by App-level ViewSettingsProvider)
+  const { mermaidEnabled, rawViewEnabled } = useViewSettings()
+
+  // Ref for scrolling content area to top when toggling views
+  const contentAreaRef = useRef<HTMLElement>(null)
 
   // Sidebar file tree state
   const [fileTree, setFileTree] = useState<FileTreeNode[]>([])
@@ -66,6 +70,13 @@ export function ReaderView({ state }: ReaderViewProps) {
 
   // Derive file type from selected file's extension
   const fileType = file ? getFileType(file) : null
+
+  // Reset scroll position to top when toggling between raw and rendered views
+  useEffect(() => {
+    if (contentAreaRef.current) {
+      contentAreaRef.current.scrollTop = 0
+    }
+  }, [rawViewEnabled])
 
   // Discover supported files on mount or when repo/folder changes (shallow — top-level only)
   useEffect(() => {
@@ -274,7 +285,7 @@ export function ReaderView({ state }: ReaderViewProps) {
 
         {/* Content Area wrapped in ErrorBoundary */}
         <ErrorBoundary>
-          <main className="flex-1 overflow-y-auto p-6">
+          <main ref={contentAreaRef} className="flex-1 overflow-y-auto p-6">
             {/* Create Share Link button — only shown when backend is configured and authenticated */}
             {canShare && (
               <div className="mb-4 flex justify-end">
@@ -354,16 +365,20 @@ export function ReaderView({ state }: ReaderViewProps) {
             )}
 
             {!isContentLoading && !contentError && fileType === 'markdown' && content !== null && (
-              <MarkdownRenderer
-                content={content}
-                basePath={activeFilePath ? activeFilePath.split('/').slice(0, -1).join('/') : folderPath}
-                owner={owner}
-                repo={repo}
-                branch={branch}
-                isPrivate={isPrivate}
-                mermaidEnabled={mermaidEnabled}
-                onNavigate={handleNavigate}
-              />
+              rawViewEnabled ? (
+                <RawMarkdownView content={content} />
+              ) : (
+                <MarkdownRenderer
+                  content={content}
+                  basePath={activeFilePath ? activeFilePath.split('/').slice(0, -1).join('/') : folderPath}
+                  owner={owner}
+                  repo={repo}
+                  branch={branch}
+                  isPrivate={isPrivate}
+                  mermaidEnabled={mermaidEnabled}
+                  onNavigate={handleNavigate}
+                />
+              )
             )}
 
             {!isContentLoading && !contentError && fileType === 'unsupported' && file && (

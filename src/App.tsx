@@ -1,5 +1,5 @@
 import { ThemeProvider } from '@/components/ThemeProvider'
-import { MermaidProvider } from '@/components/MermaidProvider'
+import { ViewSettingsProvider } from '@/components/ViewSettingsProvider'
 import { useHashRouter } from '@/hooks/useHashRouter'
 import { InputView } from '@/views/InputView'
 import { ReaderView } from '@/views/ReaderView'
@@ -30,11 +30,11 @@ function AppRouter() {
 function App() {
   return (
     <ThemeProvider>
-      <MermaidProvider>
+      <ViewSettingsProvider>
         <div className="min-h-screen bg-background text-foreground">
           <AppRouter />
         </div>
-      </MermaidProvider>
+      </ViewSettingsProvider>
     </ThemeProvider>
   )
 }

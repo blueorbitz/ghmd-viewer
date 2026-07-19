@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Sun, Moon, Monitor, LogOut, Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/components/ThemeProvider'
-import { useMermaid } from '@/components/MermaidProvider'
+import { SettingsDropdown } from '@/components/SettingsDropdown'
 import { createAuthService } from '@/services/auth-service'
 import type { ThemePreference } from '@/types/app'
 
@@ -37,7 +37,6 @@ function getThemeLabel(preference: ThemePreference): string {
 
 export function Header() {
   const { theme, setTheme } = useTheme()
-  const { mermaidEnabled, toggleMermaid } = useMermaid()
   const authService = useMemo(() => createAuthService(), [])
 
   const handleThemeCycle = () => {
@@ -93,32 +92,8 @@ export function Header() {
           </>
         )}
 
-        {/* Mermaid rendering toggle */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleMermaid}
-          aria-label={mermaidEnabled ? 'Disable Mermaid diagrams' : 'Enable Mermaid diagrams'}
-          aria-pressed={mermaidEnabled}
-          className="gap-1.5 text-xs"
-        >
-          <svg
-            className="h-4 w-4"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M4 4v16h16" />
-            <path d="M4 20l4-4 4 2 4-6 4-4" />
-          </svg>
-          <span className={mermaidEnabled ? 'text-foreground' : 'text-muted-foreground line-through'}>
-            Mermaid
-          </span>
-        </Button>
+        {/* Settings dropdown (Mermaid + Raw View toggles) */}
+        <SettingsDropdown />
 
         {/* Theme toggle button */}
         <Button
